@@ -921,14 +921,12 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {workspaceView !== 'brief' && (
-                <button
-                  onClick={() => switchWorkspace('brief')}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-white border border-slate-200 rounded-full transition-colors"
-                >
-                  Back to Brief
-                </button>
-              )}
+              <button
+                onClick={() => switchWorkspace('brief')}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-white border border-slate-200 rounded-full transition-colors"
+              >
+                Back to Brief
+              </button>
               <button
                 onClick={() => downloadExport('json')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded transition-colors"
