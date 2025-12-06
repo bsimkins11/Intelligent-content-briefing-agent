@@ -224,6 +224,7 @@ export default function Home() {
   const [sampleTab, setSampleTab] = useState<'narrative' | 'matrix' | 'json'>('narrative');
   const [showLibrary, setShowLibrary] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<'split' | 'brief' | 'matrix'>('split');
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({ content_matrix: [] }); 
@@ -467,7 +468,12 @@ export default function Home() {
     <main className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-800">
       
       {/* LEFT: Chat Interface */}
-      <div className="flex-1 flex flex-col border-r border-gray-200 relative max-w-[65%]">
+      {workspaceView !== 'matrix' && (
+      <div
+        className={`flex flex-col border-r border-gray-200 relative ${
+          workspaceView === 'brief' ? 'w-full max-w-full' : 'flex-1 max-w-[65%]'
+        }`}
+      >
         
         {/* Header - IMPROVED VISIBILITY */}
         <div className="px-8 py-6 border-b border-gray-200 bg-white flex justify-between items-center shadow-sm z-10">
@@ -481,13 +487,45 @@ export default function Home() {
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Powered by Transparent Partners</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowLibrary(true)}
               className="text-xs font-semibold text-slate-500 hover:text-teal-600 transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
             >
               Brief Library
             </button>
+            <div className="hidden md:flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
+              <button
+                onClick={() => setWorkspaceView('brief')}
+                className={`text-[11px] px-2 py-1 rounded-full ${
+                  workspaceView === 'brief'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Brief
+              </button>
+              <button
+                onClick={() => setWorkspaceView('split')}
+                className={`text-[11px] px-2 py-1 rounded-full ${
+                  workspaceView === 'split'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Split
+              </button>
+              <button
+                onClick={() => setWorkspaceView('matrix')}
+                className={`text-[11px] px-2 py-1 rounded-full ${
+                  workspaceView === 'matrix'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Matrix
+              </button>
+            </div>
             <button
               onClick={() => setShowSample(!showSample)}
               className="text-xs font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 px-5 py-2.5 rounded-full border border-teal-100 transition-colors shadow-sm"
@@ -735,9 +773,15 @@ export default function Home() {
           </div>
         )}
       </div>
+      )}
 
-      {/* RIGHT: Live Preview */}
-      <div className="w-[35%] bg-white border-l border-gray-200 hidden md:flex flex-col shadow-xl z-20">
+      {/* RIGHT: Live Preview / Content Matrix Workspace */}
+      {workspaceView !== 'brief' && (
+      <div
+        className={`bg-white border-l border-gray-200 hidden md:flex flex-col shadow-xl z-20 ${
+          workspaceView === 'matrix' ? 'w-full' : 'w-[35%]'
+        }`}
+      >
         <div className="px-6 py-5 border-b border-gray-100 bg-white flex justify-between items-center">
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Draft</h2>
             <div className="flex gap-2">
@@ -829,6 +873,7 @@ export default function Home() {
             </div>
         </div>
       </div>
+      )}
 
     </main>
   );
