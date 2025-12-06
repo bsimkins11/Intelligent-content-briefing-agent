@@ -34,6 +34,8 @@ The structured plan includes:
 - Core brief fields (campaign_name, single_minded_proposition, primary_audience, narrative_brief).
 - Audience_matrix (rows describing segments, funnel stages, triggers, channels, notes) – often coming from an uploaded CSV.
 - Channel_specs (per-channel / format specs and guardrails).
+- Brand_voice (tone, do/don't say lists) and brand_visual_guidelines (photography, motion, layout rules) that should inform copy and concepts.
+- Asset_libraries (references into a DAM or brand asset system that production will ultimately draw from).
 - Bill_of_materials (asset-level requirements: id, format, concept, source_type, specs).
 - Logic_map (if/then style rules for dynamic assembly).
 - Content_matrix (rows combining asset_id + audience_segment + stage + trigger + channel + format + message + variant + notes).

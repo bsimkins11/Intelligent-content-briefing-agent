@@ -107,6 +107,75 @@ class ContentMatrixRow(BaseModel):
     )
 
 
+class BrandVoiceProfile(BaseModel):
+    name: Optional[str] = Field(
+        default=None,
+        description="Label for this brand voice (e.g., 'Global Master', 'Product X Tone')",
+    )
+    summary: Optional[str] = Field(
+        default=None,
+        description="Short summary of the brand voice (e.g., 'confident, generous, never snarky')",
+    )
+    do_say: Optional[str] = Field(
+        default=None,
+        description="Examples of phrases, constructions, and tonal moves we like to use",
+    )
+    dont_say: Optional[str] = Field(
+        default=None,
+        description="Phrases or tones to avoid",
+    )
+    source_document_url: Optional[str] = Field(
+        default=None,
+        description="Reference to the full brand voice PDF / doc stored in a DAM or knowledge system",
+    )
+
+
+class BrandVisualGuidelines(BaseModel):
+    name: Optional[str] = Field(
+        default=None,
+        description="Name of this visual system (e.g., '2025 Global Brand System')",
+    )
+    photography_notes: Optional[str] = Field(
+        default=None,
+        description="High-level guidance on photography style, casting, locations, etc.",
+    )
+    illustration_notes: Optional[str] = Field(
+        default=None,
+        description="Guidance on illustration or iconography, if relevant",
+    )
+    motion_notes: Optional[str] = Field(
+        default=None,
+        description="Motion/animation rules that concepts and assets should respect",
+    )
+    layout_dos_and_donts: Optional[str] = Field(
+        default=None,
+        description="Key layout rules (e.g., logo placement, safe zones, background usage)",
+    )
+    source_document_url: Optional[str] = Field(
+        default=None,
+        description="Reference to the full visual guidelines stored in a DAM or design system",
+    )
+
+
+class AssetLibraryReference(BaseModel):
+    dam_system: Optional[str] = Field(
+        default=None,
+        description="Name of the DAM or storage system (e.g., 'Bynder', 'Brandfolder', 'GCS bucket')",
+    )
+    library_id: Optional[str] = Field(
+        default=None,
+        description="Identifier for the relevant library, collection, or folder in the DAM",
+    )
+    search_tags: Optional[str] = Field(
+        default=None,
+        description="Hint text or tags for assets that should be considered (e.g., 'Spring 2025 hero shoot')",
+    )
+    deep_link_url: Optional[str] = Field(
+        default=None,
+        description="Optional deep link into the DAM for quick access",
+    )
+
+
 class ProductionMasterPlan(BaseModel):
     # Core brief
     campaign_name: str = Field(description="Name of the campaign")
@@ -115,6 +184,20 @@ class ProductionMasterPlan(BaseModel):
     narrative_brief: Optional[str] = Field(
         default=None,
         description="Written narrative brief a creative director could review and approve",
+    )
+
+    # Brand system references (placeholders for future upload / DAM connectors)
+    brand_voice: Optional[BrandVoiceProfile] = Field(
+        default=None,
+        description="Reference to brand voice guidelines the agent and concepts should follow",
+    )
+    brand_visual_guidelines: Optional[BrandVisualGuidelines] = Field(
+        default=None,
+        description="Reference to visual guidelines (photography, motion, layout) for concepts and assets",
+    )
+    asset_libraries: Optional[list[AssetLibraryReference]] = Field(
+        default=None,
+        description="Pointers to DAM libraries / collections the production plan should pull from",
     )
 
     # Audience + channel context
