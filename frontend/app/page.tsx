@@ -37,33 +37,6 @@ type Concept = {
   generatedPrompt?: string;
 };
 
-function buildConceptPrompt(concept: Concept, plan: any): string {
-  const lines: string[] = [];
-
-  if (plan?.campaign_name) {
-    lines.push(`Campaign: ${plan.campaign_name}`);
-  }
-  if (plan?.single_minded_proposition) {
-    lines.push(`Single-minded proposition: ${plan.single_minded_proposition}`);
-  }
-  if (plan?.primary_audience) {
-    lines.push(`Primary audience: ${plan.primary_audience}`);
-  }
-  if (plan?.brand_voice?.summary) {
-    lines.push(`Brand voice: ${plan.brand_voice.summary}`);
-  }
-
-  lines.push(`Concept title: ${concept.title || 'Untitled concept'}`);
-  if (concept.description) {
-    lines.push(`Concept description: ${concept.description}`);
-  }
-  if (concept.notes) {
-    lines.push(`Production notes: ${concept.notes}`);
-  }
-
-  return lines.join('\n');
-}
-
 // --- Sample Data ---
 const SAMPLE_JSON = {
   "campaign_name": "Summer Glow 2024",
@@ -1230,7 +1203,31 @@ export default function Home() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const prompt = buildConceptPrompt(c, previewPlan);
+                                    const plan: any = previewPlan || {};
+                                    const lines: string[] = [];
+
+                                    if (plan.campaign_name) {
+                                      lines.push(`Campaign: ${plan.campaign_name}`);
+                                    }
+                                    if (plan.single_minded_proposition) {
+                                      lines.push(`Single-minded proposition: ${plan.single_minded_proposition}`);
+                                    }
+                                    if (plan.primary_audience) {
+                                      lines.push(`Primary audience: ${plan.primary_audience}`);
+                                    }
+                                    if (plan.brand_voice?.summary) {
+                                      lines.push(`Brand voice: ${plan.brand_voice.summary}`);
+                                    }
+
+                                    lines.push(`Concept title: ${c.title || 'Untitled concept'}`);
+                                    if (c.description) {
+                                      lines.push(`Concept description: ${c.description}`);
+                                    }
+                                    if (c.notes) {
+                                      lines.push(`Production notes: ${c.notes}`);
+                                    }
+
+                                    const prompt = lines.join('\n');
                                     setConcepts((prev) =>
                                       prev.map((existing, i) =>
                                         i === index
