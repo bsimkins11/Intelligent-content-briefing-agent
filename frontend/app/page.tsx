@@ -554,7 +554,7 @@ export default function Home() {
     setConcepts((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const generateAssetForConcept = (index: number) => {
+  function generateAssetForConcept(index: number) {
     const concept = concepts[index];
     if (!concept) return;
 
@@ -595,7 +595,7 @@ export default function Home() {
           : c,
       ),
     );
-  };
+  }
 
   return (
     <main
