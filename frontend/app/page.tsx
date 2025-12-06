@@ -581,16 +581,18 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (workspaceView !== 'brief') switchWorkspace('brief');
-                setShowSample(false);
-                setShowLibrary((prev) => !prev);
-              }}
-              className="text-xs font-semibold text-slate-500 hover:text-teal-600 transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
-            >
-              Brief Library
-            </button>
+            {workspaceView === 'brief' && (
+              <button
+                onClick={() => {
+                  if (workspaceView !== 'brief') switchWorkspace('brief');
+                  setShowSample(false);
+                  setShowLibrary((prev) => !prev);
+                }}
+                className="text-xs font-semibold text-slate-500 hover:text-teal-600 transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
+              >
+                Brief Library
+              </button>
+            )}
             <div className="hidden md:flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
               <button
                 onClick={() => switchWorkspace('brief')}
@@ -919,7 +921,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {workspaceView === 'matrix' && (
+              {workspaceView !== 'brief' && (
                 <button
                   onClick={() => switchWorkspace('brief')}
                   className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-white border border-slate-200 rounded-full transition-colors"
