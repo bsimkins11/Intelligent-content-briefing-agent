@@ -223,6 +223,7 @@ export default function Home() {
   const [showSample, setShowSample] = useState(false);
   const [sampleTab, setSampleTab] = useState<'narrative' | 'matrix' | 'json'>('narrative');
   const [showLibrary, setShowLibrary] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({ content_matrix: [] }); 
@@ -245,6 +246,23 @@ export default function Home() {
     setMessages(newHistory);
     setInput('');
     setLoading(true);
+
+    // In demo mode, simulate the agent locally without calling the backend
+    if (demoMode) {
+      const snippet = textToSend.length > 220 ? `${textToSend.slice(0, 220)}…` : textToSend;
+      const demoReply =
+        `Demo mode: Based on what you just shared, I'm tightening the brief and thinking about modular content.\n\n` +
+        `1) Brief refinement:\n` +
+        `- I’ll treat this as an update to the narrative_brief and core fields.\n` +
+        `- I’ll look for clear objectives, primary audience, and any guardrails inside:\n\"${snippet}\".\n\n` +
+        `2) Next step:\n` +
+        `- Once you're happy with the brief, say something like "let's build the content matrix" and I'll start suggesting rows ` +
+        `(audience x stage x trigger x channel) that we can then edit in the grid on the right.`;
+
+      setMessages([...newHistory, { role: 'assistant', content: demoReply }]);
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch('http://localhost:8000/chat', {
@@ -272,40 +290,75 @@ export default function Home() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
+      if (demoMode) {
+        // Lightweight client-side CSV handling for demo purposes
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        const headers = lines[0].split(',').map((h) => h.trim());
+        const rows = lines.slice(1).map((line) => {
+          const cols = line.split(',');
+          const row: Record<string, string> = {};
+          cols.forEach((val, idx) => {
+            const key = headers[idx] ?? `col_${idx}`;
+            row[key] = val.trim();
+          });
+          return row;
+        });
 
-      // If this is an audience CSV, keep a structured copy in the plan
-      if (data.kind === 'audience_matrix') {
         setPreviewPlan((prev: any) => ({
           ...prev,
-          audience_matrix: data.rows,
-          audience_headers: data.headers,
+          audience_matrix: rows,
+          audience_headers: headers,
         }));
 
-        const sampleRows = Array.isArray(data.rows) ? data.rows.slice(0, 3) : [];
+        const sampleRows = rows.slice(0, 3);
         const sampleJson = JSON.stringify(sampleRows, null, 2);
-        const cols = Array.isArray(data.headers) ? data.headers.join(', ') : 'N/A';
+        const cols = headers.join(', ');
 
         const userMessage =
-          `I just uploaded an audience matrix CSV called "${data.filename}".\n` +
+          `I just uploaded an audience matrix CSV called "${file.name}".\n` +
           `Columns: ${cols}.\n` +
           `Here is a small sample of the rows:\n${sampleJson}\n` +
           `Please use this audience structure when shaping the brief and content matrix.`;
 
         await sendMessage(userMessage);
       } else {
-        const preview = (data.content || '').substring(0, 200);
-        const userMessage = `I just uploaded a file named "${data.filename}". Content preview: ${preview}...`;
-        await sendMessage(userMessage);
+        const res = await fetch('http://localhost:8000/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+
+        // If this is an audience CSV, keep a structured copy in the plan
+        if (data.kind === 'audience_matrix') {
+          setPreviewPlan((prev: any) => ({
+            ...prev,
+            audience_matrix: data.rows,
+            audience_headers: data.headers,
+          }));
+
+          const sampleRows = Array.isArray(data.rows) ? data.rows.slice(0, 3) : [];
+          const sampleJson = JSON.stringify(sampleRows, null, 2);
+          const cols = Array.isArray(data.headers) ? data.headers.join(', ') : 'N/A';
+
+          const userMessage =
+            `I just uploaded an audience matrix CSV called "${data.filename}".\n` +
+            `Columns: ${cols}.\n` +
+            `Here is a small sample of the rows:\n${sampleJson}\n` +
+            `Please use this audience structure when shaping the brief and content matrix.`;
+
+          await sendMessage(userMessage);
+        } else {
+          const preview = (data.content || '').substring(0, 200);
+          const userMessage = `I just uploaded a file named "${data.filename}". Content preview: ${preview}...`;
+          await sendMessage(userMessage);
+        }
       }
-      
     } catch (error) {
       console.error("Upload failed", error);
-      alert("Failed to upload file");
+      if (!demoMode) {
+        alert("Failed to upload file");
+      }
       setLoading(false);
     }
     
@@ -338,20 +391,49 @@ export default function Home() {
         return;
     }
 
+    // In demo mode, generate a simple text export client-side for TXT/PDF
+    if (demoMode) {
+      const lines: string[] = [];
+      lines.push(`Production Master Plan: ${planToSend.campaign_name ?? 'Untitled'}`);
+      lines.push('==================================================');
+      lines.push('');
+      lines.push(`SMP: ${planToSend.single_minded_proposition ?? 'N/A'}`);
+      lines.push('');
+      if (planToSend.narrative_brief) {
+        lines.push('Narrative Brief:');
+        lines.push(planToSend.narrative_brief);
+        lines.push('');
+      }
+      lines.push('Content Matrix (preview):');
+      (planToSend.content_matrix || []).forEach((row: any) => {
+        lines.push(
+          `- asset=${row.asset_id} | audience=${row.audience_segment} | stage=${row.funnel_stage} | trigger=${row.trigger} | channel=${row.channel} | format=${row.format} | message=${row.message}`,
+        );
+      });
+      const text = lines.join('\n') + '\n';
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `brief.${format === 'pdf' ? 'txt' : format}`;
+      a.click();
+      return;
+    }
+
     try {
-        const res = await fetch(`http://localhost:8000/export/${format}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan: planToSend }),
-        });
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `brief.${format}`;
-        a.click();
+      const res = await fetch(`http://localhost:8000/export/${format}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planToSend }),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `brief.${format}`;
+      a.click();
     } catch (error) {
-        console.error("Export failed", error);
+      console.error("Export failed", error);
     }
   };
 
@@ -406,11 +488,32 @@ export default function Home() {
             >
               Brief Library
             </button>
-            <button 
+            <button
               onClick={() => setShowSample(!showSample)}
               className="text-xs font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 px-5 py-2.5 rounded-full border border-teal-100 transition-colors shadow-sm"
             >
               {showSample ? 'Hide Sample' : 'View Sample Output'}
+            </button>
+            <button
+              onClick={() => {
+                setDemoMode((prev) => !prev);
+                // Reset conversation when toggling demo mode for clarity
+                setMessages([
+                  {
+                    role: 'assistant',
+                    content: !demoMode
+                      ? 'Demo mode is ON. I will simulate the agent locally so you can click around the interface without a backend.'
+                      : 'Demo mode is OFF. I will now talk to the live backend (when available on localhost:8000).',
+                  },
+                ]);
+              }}
+              className={`text-xs font-semibold px-4 py-2 rounded-full border transition-colors ${
+                demoMode
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-500 border-slate-200 hover:text-teal-600 hover:border-teal-300'
+              }`}
+            >
+              {demoMode ? 'Demo Mode: On' : 'Demo Mode: Off'}
             </button>
           </div>
         </div>
