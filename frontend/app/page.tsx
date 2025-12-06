@@ -923,10 +923,32 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => switchWorkspace('brief')}
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-white border border-slate-200 rounded-full transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 bg-teal-50 border border-teal-100 rounded-full transition-colors"
               >
                 Back to Brief
               </button>
+              <div className="hidden md:flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
+                <button
+                  onClick={() => switchWorkspace('split')}
+                  className={`text-[11px] px-2 py-1 rounded-full ${
+                    workspaceView === 'split'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Split
+                </button>
+                <button
+                  onClick={() => switchWorkspace('matrix')}
+                  className={`text-[11px] px-2 py-1 rounded-full ${
+                    workspaceView === 'matrix'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Matrix
+                </button>
+              </div>
               <button
                 onClick={() => downloadExport('json')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded transition-colors"
