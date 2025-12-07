@@ -760,6 +760,11 @@ export default function Home() {
     setVisibleMatrixFields((prev) => [...prev, key]);
   }
 
+  function deleteCustomMatrixField(key: MatrixFieldKey) {
+    setMatrixFields((prev) => prev.filter((f) => !(f.key === key && f.isCustom)));
+    setVisibleMatrixFields((prev) => prev.filter((k) => k !== key));
+  }
+
   function applyMatrixTemplate(templateId: string) {
     const template = matrixLibrary.find((t) => t.id === templateId);
     if (!template) return;
@@ -1296,35 +1301,57 @@ export default function Home() {
                           </button>
                         </div>
                         {showMatrixFieldConfig && (
-                          <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <p className="text-[11px] font-medium text-slate-500 mb-1">
-                              Show / hide columns (you can also add extra fields like Source Type, Specs, and Notes)
-                            </p>
+                          <div className="mb-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm">
+                            <div className="flex items-center justify-between mb-2 gap-3">
+                              <div>
+                                <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                                  Matrix Fields
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                  Turn columns on/off and add custom fields for this content matrix.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={addCustomMatrixField}
+                                className="text-[11px] px-3 py-1 rounded-full border border-teal-400 text-teal-700 bg-white hover:bg-teal-50"
+                              >
+                                + Add custom field
+                              </button>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {matrixFields.map((field) => {
                                 const checked = visibleMatrixFields.includes(field.key);
+                                const isCustom = field.isCustom;
                                 return (
-                                  <button
+                                  <div
                                     key={field.key}
-                                    type="button"
-                                    onClick={() => toggleMatrixField(field.key)}
-                                    className={`px-2.5 py-1 text-[11px] rounded-full border ${
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-full border ${
                                       checked
                                         ? 'bg-white border-teal-500 text-teal-700 shadow-sm'
                                         : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
                                     }`}
                                   >
-                                    {field.label}
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleMatrixField(field.key)}
+                                      className="outline-none"
+                                    >
+                                      {field.label}
+                                    </button>
+                                    {isCustom && (
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteCustomMatrixField(field.key)}
+                                        className="ml-1 text-[10px] text-slate-400 hover:text-red-500"
+                                        title="Remove custom field"
+                                      >
+                                        ×
+                                      </button>
+                                    )}
+                                  </div>
                                 );
                               })}
-                              <button
-                                type="button"
-                                onClick={addCustomMatrixField}
-                                className="px-2.5 py-1 text-[11px] rounded-full border border-dashed border-teal-400 text-teal-700 bg-white hover:bg-teal-50"
-                              >
-                                + Add custom field
-                              </button>
                             </div>
                           </div>
                         )}
