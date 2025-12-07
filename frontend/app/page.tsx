@@ -402,7 +402,7 @@ export default function Home() {
   const [sampleTab, setSampleTab] = useState<'narrative' | 'matrix' | 'json'>('narrative');
   const [showLibrary, setShowLibrary] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<'brief' | 'split' | 'matrix'>('split');
+  const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts'>('brief');
   const [splitRatio, setSplitRatio] = useState(0.6); // left pane width in split view
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [rightTab, setRightTab] = useState<'matrix' | 'concepts' | 'moodboard'>('matrix');
@@ -701,7 +701,7 @@ export default function Home() {
     }
   };
 
-  const switchWorkspace = (view: 'brief' | 'split' | 'matrix') => {
+  const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts') => {
     setWorkspaceView(view);
     if (view !== 'brief') {
       // Keep brief-only overlays tied to the brief tab
@@ -942,16 +942,6 @@ export default function Home() {
               Brief
             </button>
             <button
-              onClick={() => switchWorkspace('split')}
-              className={`text-[11px] px-2 py-1 rounded-full ${
-                workspaceView === 'split'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Split
-            </button>
-            <button
               onClick={() => switchWorkspace('matrix')}
               className={`text-[11px] px-2 py-1 rounded-full ${
                 workspaceView === 'matrix'
@@ -960,6 +950,16 @@ export default function Home() {
               }`}
             >
               Matrix
+            </button>
+            <button
+              onClick={() => switchWorkspace('concepts')}
+              className={`text-[11px] px-2 py-1 rounded-full ${
+                workspaceView === 'concepts'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Concepts
             </button>
           </div>
           <button
@@ -1006,11 +1006,6 @@ export default function Home() {
                 ? 'w-full md:w-1/2 md:max-w-1/2'
                 : 'shrink-0'
             }`}
-            style={
-              workspaceView === 'split'
-                ? { width: `${splitRatio * 100}%` }
-                : undefined
-            }
           >
             {/* Chat Area */}
             <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#F8FAFC]">
@@ -1297,61 +1292,17 @@ export default function Home() {
         </div>
       )}
 
-      {/* RIGHT: Live Preview / Content Matrix Workspace */}
+      {/* RIGHT: Live Preview / Content Matrix Workspace / Concepts */}
       {workspaceView !== 'brief' && (
       <>
-        {/* Draggable divider in split view on desktop */}
-        {workspaceView === 'split' && (
-          <div
-            className="hidden md:block w-1 bg-slate-200 hover:bg-slate-300 cursor-col-resize"
-            onMouseDown={() => setIsDraggingDivider(true)}
-          />
-        )}
         <div
-          className={`bg-white border-l border-gray-200 hidden md:flex flex-col shadow-xl z-20 ${
-            workspaceView === 'matrix' ? 'w-full' : 'shrink-0'
-          }`}
-          style={
-            workspaceView === 'split'
-              ? { width: `${(1 - splitRatio) * 100}%` }
-              : undefined
-          }
+          className="bg-white border-l border-gray-200 hidden md:flex flex-col shadow-xl z-20 w-full"
         >
           <div className="px-6 py-5 border-b border-gray-100 bg-white flex justify-between items-center select-none">
             <div className="flex items-center gap-4">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Production Workspace</h2>
-              <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
-                <button
-                  onClick={() => setRightTab('matrix')}
-                  className={`text-[11px] px-2 py-1 rounded-full ${
-                    rightTab === 'matrix'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Matrix
-                </button>
-                <button
-                  onClick={() => setRightTab('concepts')}
-                  className={`text-[11px] px-2 py-1 rounded-full ${
-                    rightTab === 'concepts'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Concepts
-                </button>
-                <button
-                  onClick={() => setRightTab('moodboard')}
-                  className={`text-[11px] px-2 py-1 rounded-full ${
-                    rightTab === 'moodboard'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Concept Board
-                </button>
-              </div>
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                {workspaceView === 'matrix' ? 'Production Workspace' : 'Concept Workspace'}
+              </h2>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -1360,28 +1311,6 @@ export default function Home() {
               >
                 Back to Brief
               </button>
-              <div className="hidden md:flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
-                <button
-                  onClick={() => switchWorkspace('split')}
-                  className={`text-[11px] px-2 py-1 rounded-full ${
-                    workspaceView === 'split'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Split
-                </button>
-                <button
-                  onClick={() => switchWorkspace('matrix')}
-                  className={`text-[11px] px-2 py-1 rounded-full ${
-                    workspaceView === 'matrix'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Matrix
-                </button>
-              </div>
               <button
                 onClick={() => downloadExport('json')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded transition-colors"
@@ -1405,7 +1334,7 @@ export default function Home() {
 
           <div className="flex-1 p-6 overflow-y-auto bg-slate-50/30 relative">
             <div className="space-y-6">
-              {rightTab === 'matrix' && (
+              {workspaceView === 'matrix' && (
                 <>
                   {matrixRows.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 gap-4 mt-20">
@@ -1658,7 +1587,7 @@ export default function Home() {
                 </div>
               )}
 
-              {rightTab === 'concepts' && (
+              {workspaceView === 'concepts' && (
                 <div className="space-y-4">
                   {/* Top-level Concept Canvas toolbar */}
                   <div className="flex flex-col gap-2 mb-2">
@@ -1880,7 +1809,7 @@ export default function Home() {
                 </div>
               )}
 
-              {rightTab === 'moodboard' && (
+              {workspaceView === 'concepts' && rightTab === 'moodboard' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
