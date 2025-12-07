@@ -400,7 +400,28 @@ export default function Home() {
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({ content_matrix: [] }); 
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
-  const [concepts, setConcepts] = useState<Concept[]>([]);
+  const [concepts, setConcepts] = useState<Concept[]>([
+    {
+      id: 'CON-001',
+      asset_id: 'VID-001',
+      title: 'Night Reset Ritual',
+      description:
+        'Top-funnel vertical story that dramatizes the before/after of a wired-and-tired professional discovering Aurora’s “Night Reset” scene.',
+      notes: 'Warm, cinematic; emphasize modular scenes and simple UI. Avoid heavy data dashboards.',
+      kind: 'video',
+      status: 'idle',
+    },
+    {
+      id: 'CON-002',
+      asset_id: 'IMG-001',
+      title: 'Hero Shelf Moment',
+      description:
+        'Static hero frame that pairs the product with a simplified “Glow Grid” overlay showing morning, mid-day, and evening use moments.',
+      notes: 'Use existing brand photography; keep grid minimal and legible on mobile. No small text blocks.',
+      kind: 'image',
+      status: 'idle',
+    },
+  ]);
   const [moodBoardConceptIds, setMoodBoardConceptIds] = useState<string[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1270,8 +1291,7 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)] gap-4">
-                      {/* Left: Content Matrix */}
+                    <div className="w-full">
                       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <div className="flex justify-between items-center mb-3">
                           <div className="flex items-center gap-3">
