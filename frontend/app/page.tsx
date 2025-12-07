@@ -16,19 +16,24 @@ type MatrixRow = {
   format: string;
   message: string;
   variant: string;
+  // Optional extended fields so users can add more detail to the matrix
+  source_type?: string;
+  specs?: string;
+  notes?: string;
+  // Custom fields keyed by user-defined column keys
+  [key: string]: string | undefined;
 };
 
-type MatrixFieldKey =
-  | 'id'
-  | 'audience_segment'
-  | 'funnel_stage'
-  | 'trigger'
-  | 'channel'
-  | 'format'
-  | 'message'
-  | 'variant';
+// MatrixFieldKey is string so we can support arbitrary user-defined columns.
+type MatrixFieldKey = string;
 
-const MATRIX_FIELDS: { key: MatrixFieldKey; label: string }[] = [
+type MatrixFieldConfig = {
+  key: MatrixFieldKey;
+  label: string;
+  isCustom?: boolean;
+};
+
+const BASE_MATRIX_FIELDS: MatrixFieldConfig[] = [
   { key: 'id', label: 'Asset ID' },
   { key: 'audience_segment', label: 'Audience' },
   { key: 'funnel_stage', label: 'Stage' },
@@ -37,6 +42,9 @@ const MATRIX_FIELDS: { key: MatrixFieldKey; label: string }[] = [
   { key: 'format', label: 'Format' },
   { key: 'message', label: 'Message' },
   { key: 'variant', label: 'Variant' },
+  { key: 'source_type', label: 'Source Type' },
+  { key: 'specs', label: 'Specs' },
+  { key: 'notes', label: 'Notes' },
 ];
 
 type ContentMatrixTemplate = {
@@ -381,8 +389,9 @@ export default function Home() {
   const [splitRatio, setSplitRatio] = useState(0.6); // left pane width in split view
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [rightTab, setRightTab] = useState<'matrix' | 'concepts'>('matrix');
+  const [matrixFields, setMatrixFields] = useState<MatrixFieldConfig[]>(BASE_MATRIX_FIELDS);
   const [visibleMatrixFields, setVisibleMatrixFields] = useState<MatrixFieldKey[]>(
-    ['id', 'audience_segment', 'funnel_stage', 'trigger', 'channel', 'format', 'message', 'variant'],
+    BASE_MATRIX_FIELDS.map((f) => f.key),
   );
   const [showMatrixFieldConfig, setShowMatrixFieldConfig] = useState(false);
   const [showMatrixLibrary, setShowMatrixLibrary] = useState(false);
@@ -568,6 +577,9 @@ export default function Home() {
         format: row.format,
         message: row.message,
         variant: row.variant,
+        source_type: row.source_type,
+        specs: row.specs,
+        notes: row.notes,
       })),
       concepts: concepts.map((c) => ({
         id: c.id,
@@ -662,6 +674,9 @@ export default function Home() {
         format: '',
         message: '',
         variant: '',
+        source_type: '',
+        specs: '',
+        notes: '',
       },
     ]);
   }
@@ -713,6 +728,35 @@ export default function Home() {
       }
       return [...prev, key];
     });
+  }
+
+  function addCustomMatrixField() {
+    const rawLabel = window.prompt('Name this new column (e.g., Market, Owner, Priority):');
+    if (!rawLabel) return;
+    const trimmed = rawLabel.trim();
+    if (!trimmed) return;
+
+    // Derive a safe key from the label
+    const derivedKey = trimmed
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+
+    const key = derivedKey || `field_${matrixFields.length + 1}`;
+
+    if (matrixFields.some((f) => f.key === key)) {
+      alert('A column with this name already exists.');
+      return;
+    }
+
+    const newField: MatrixFieldConfig = {
+      key,
+      label: trimmed,
+      isCustom: true,
+    };
+
+    setMatrixFields((prev) => [...prev, newField]);
+    setVisibleMatrixFields((prev) => [...prev, key]);
   }
 
   function applyMatrixTemplate(templateId: string) {
@@ -1210,98 +1254,179 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            Content Matrix
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => setShowMatrixFieldConfig((prev) => !prev)}
-                            className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:text-teal-700 hover:border-teal-300 bg-white"
-                          >
-                            Customize columns
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowMatrixLibrary(true)}
-                            className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:text-teal-700 hover:border-teal-300 bg-white"
-                          >
-                            Matrix Library
-                          </button>
-                        </div>
-                        <button
-                          onClick={addMatrixRow}
-                          className="text-xs text-teal-600 hover:text-teal-700 font-medium px-3 py-1 rounded-full bg-teal-50 border border-teal-100"
-                        >
-                          + Add row
-                        </button>
-                      </div>
-                      {showMatrixFieldConfig && (
-                        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                          <p className="text-[11px] font-medium text-slate-500 mb-1">
-                            Show / hide columns
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {MATRIX_FIELDS.map((field) => {
-                              const checked = visibleMatrixFields.includes(field.key);
-                              return (
-                                <button
-                                  key={field.key}
-                                  type="button"
-                                  onClick={() => toggleMatrixField(field.key)}
-                                  className={`px-2.5 py-1 text-[11px] rounded-full border ${
-                                    checked
-                                      ? 'bg-white border-teal-500 text-teal-700 shadow-sm'
-                                      : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
-                                  }`}
-                                >
-                                  {field.label}
-                                </button>
-                              );
-                            })}
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.3fr)] gap-4">
+                      {/* Left: Content Matrix */}
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                              Content Matrix
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => setShowMatrixFieldConfig((prev) => !prev)}
+                              className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:text-teal-700 hover:border-teal-300 bg-white"
+                            >
+                              Customize columns
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowMatrixLibrary(true)}
+                              className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:text-teal-700 hover:border-teal-300 bg-white"
+                            >
+                              Matrix Library
+                            </button>
                           </div>
+                          <button
+                            onClick={addMatrixRow}
+                            className="text-xs text-teal-600 hover:text-teal-700 font-medium px-3 py-1 rounded-full bg-teal-50 border border-teal-100"
+                          >
+                            + Add row
+                          </button>
                         </div>
-                      )}
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-50 text-slate-500">
-                            <tr>
-                              {MATRIX_FIELDS.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
-                                <th key={field.key} className="px-2 py-2">
-                                  {field.label}
-                                </th>
-                              ))}
-                              <th className="px-2 py-2"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {matrixRows.map((row, index) => (
-                              <tr key={index} className="align-top">
-                                {MATRIX_FIELDS.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
-                                  <td key={field.key} className="px-2 py-1">
-                                    <input
-                                      value={row[field.key]}
-                                      onChange={(e) =>
-                                        updateMatrixCell(index, field.key as MatrixFieldKey, e.target.value)
-                                      }
-                                      className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                    />
-                                  </td>
-                                ))}
-                                <td className="px-2 py-1 text-right">
+                        {showMatrixFieldConfig && (
+                          <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p className="text-[11px] font-medium text-slate-500 mb-1">
+                              Show / hide columns (you can also add extra fields like Source Type, Specs, and Notes)
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {matrixFields.map((field) => {
+                                const checked = visibleMatrixFields.includes(field.key);
+                                return (
                                   <button
-                                    onClick={() => removeMatrixRow(index)}
-                                    className="text-[11px] text-slate-400 hover:text-red-500"
+                                    key={field.key}
+                                    type="button"
+                                    onClick={() => toggleMatrixField(field.key)}
+                                    className={`px-2.5 py-1 text-[11px] rounded-full border ${
+                                      checked
+                                        ? 'bg-white border-teal-500 text-teal-700 shadow-sm'
+                                        : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
+                                    }`}
                                   >
-                                    Remove
+                                    {field.label}
                                   </button>
-                                </td>
+                                );
+                              })}
+                              <button
+                                type="button"
+                                onClick={addCustomMatrixField}
+                                className="px-2.5 py-1 text-[11px] rounded-full border border-dashed border-teal-400 text-teal-700 bg-white hover:bg-teal-50"
+                              >
+                                + Add custom field
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-50 text-slate-500">
+                              <tr>
+                                {matrixFields.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
+                                  <th key={field.key} className="px-2 py-2">
+                                    {field.label}
+                                  </th>
+                                ))}
+                                <th className="px-2 py-2"></th>
                               </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {matrixRows.map((row, index) => (
+                                <tr key={index} className="align-top">
+                                  {matrixFields.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
+                                    <td key={field.key} className="px-2 py-1">
+                                      <input
+                                        value={row[field.key] ?? ''}
+                                        onChange={(e) =>
+                                          updateMatrixCell(index, field.key as MatrixFieldKey, e.target.value)
+                                        }
+                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                      />
+                                    </td>
+                                  ))}
+                                  <td className="px-2 py-1 text-right">
+                                    <button
+                                      onClick={() => removeMatrixRow(index)}
+                                      className="text-[11px] text-slate-400 hover:text-red-500"
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Right: Concepts column */}
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                              Concepts
+                            </h3>
+                            <p className="text-[11px] text-slate-500">
+                              Quick view of concepts linked to this plan. Edit details in the Concepts tab.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={addConcept}
+                            className="text-[11px] px-3 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 hover:bg-teal-100"
+                          >
+                            + Add concept
+                          </button>
+                        </div>
+
+                        {concepts.length === 0 ? (
+                          <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 gap-2 py-4">
+                            <p className="text-[11px] max-w-[220px]">
+                              No concepts yet. Add concepts here or switch to the Concepts tab for richer editing.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex-1 overflow-y-auto space-y-2">
+                            {concepts.map((c, index) => (
+                              <div
+                                key={c.id}
+                                className="border border-slate-200 rounded-lg px-3 py-2 flex flex-col gap-1 bg-slate-50/60"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                      {c.title || 'Untitled concept'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">
+                                      Asset: <span className="font-mono">{c.asset_id}</span>
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeConcept(index)}
+                                    className="text-[10px] text-slate-400 hover:text-red-500"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                                {c.description && (
+                                  <p className="text-[10px] text-slate-600 line-clamp-2">
+                                    {c.description}
+                                  </p>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setRightTab('concepts')}
+                                  className="self-start mt-1 text-[10px] text-teal-600 hover:text-teal-700"
+                                >
+                                  Edit in Concepts canvas →
+                                </button>
+                              </div>
                             ))}
-                          </tbody>
-                        </table>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 pt-1">
+                          Concepts are automatically included when you export JSON / TXT.
+                        </p>
                       </div>
                     </div>
                   )}
