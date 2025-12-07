@@ -403,9 +403,9 @@ export default function Home() {
   const [showLibrary, setShowLibrary] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts'>('brief');
-  const [splitRatio, setSplitRatio] = useState(0.6); // left pane width in split view
+  const [splitRatio, setSplitRatio] = useState(0.6); // kept for potential future resizing
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
-  const [rightTab, setRightTab] = useState<'matrix' | 'concepts' | 'moodboard'>('matrix');
+  const [rightTab, setRightTab] = useState<'builder' | 'board'>('builder');
   const [matrixFields, setMatrixFields] = useState<MatrixFieldConfig[]>(BASE_MATRIX_FIELDS);
   const [visibleMatrixFields, setVisibleMatrixFields] = useState<MatrixFieldKey[]>(
     BASE_MATRIX_FIELDS.map((f) => f.key),
@@ -703,6 +703,11 @@ export default function Home() {
 
   const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts') => {
     setWorkspaceView(view);
+
+    if (view === 'concepts') {
+      setRightTab('builder');
+    }
+
     if (view !== 'brief') {
       // Keep brief-only overlays tied to the brief tab
       setShowSample(false);
@@ -1303,6 +1308,30 @@ export default function Home() {
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 {workspaceView === 'matrix' ? 'Production Workspace' : 'Concept Workspace'}
               </h2>
+              {workspaceView === 'concepts' && (
+                <div className="ml-4 flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
+                  <button
+                    onClick={() => setRightTab('builder')}
+                    className={`text-[11px] px-2 py-1 rounded-full ${
+                      rightTab === 'builder'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Concept Builder
+                  </button>
+                  <button
+                    onClick={() => setRightTab('board')}
+                    className={`text-[11px] px-2 py-1 rounded-full ${
+                      rightTab === 'board'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Concept Board
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -1809,7 +1838,7 @@ export default function Home() {
                 </div>
               )}
 
-              {workspaceView === 'concepts' && rightTab === 'moodboard' && (
+              {workspaceView === 'concepts' && rightTab === 'board' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1822,7 +1851,7 @@ export default function Home() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setRightTab('concepts')}
+                      onClick={() => setRightTab('builder')}
                       className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
                     >
                       Manage concepts
