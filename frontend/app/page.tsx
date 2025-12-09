@@ -174,10 +174,20 @@ type FeedRow = {
   trigger_condition?: string | null;
   destination_url?: string | null;
   utm_suffix?: string | null;
+  // Support user-defined custom variables
+  [key: string]: string | boolean | null | undefined;
 };
 
-const FEED_COLUMNS: { key: keyof FeedRow; label: string; readOnly?: boolean }[] = [
-  { key: 'row_id', label: 'Row ID', readOnly: true },
+type FeedFieldKey = string;
+
+type FeedFieldConfig = {
+  key: FeedFieldKey;
+  label: string;
+  isCustom?: boolean;
+};
+
+const BASE_FEED_FIELDS: FeedFieldConfig[] = [
+  { key: 'row_id', label: 'Row ID' },
   { key: 'creative_filename', label: 'Creative Filename' },
   { key: 'reporting_label', label: 'Reporting Label' },
   { key: 'is_default', label: 'Is Default?' },
@@ -564,6 +574,11 @@ export default function Home() {
   const [productionLoading, setProductionLoading] = useState(false);
   const [productionError, setProductionError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<ProductionAsset | null>(null);
+  const [feedFields, setFeedFields] = useState<FeedFieldConfig[]>(BASE_FEED_FIELDS);
+  const [visibleFeedFields, setVisibleFeedFields] = useState<FeedFieldKey[]>(
+    BASE_FEED_FIELDS.map((f) => f.key),
+  );
+  const [showFeedFieldConfig, setShowFeedFieldConfig] = useState(false);
   const [feedRows, setFeedRows] = useState<FeedRow[]>([]);
 
   // This would eventually be live-updated from the backend
@@ -635,29 +650,36 @@ export default function Home() {
           typeof crypto !== 'undefined' && 'randomUUID' in crypto && crypto.randomUUID
             ? crypto.randomUUID()
             : `ROW-${Date.now()}-${prev.length + 1}`,
-        creative_filename: '',
-        reporting_label: '',
+        // Identity & Taxonomy – seeded with example structure from the Master Feed spec
+        creative_filename: 'ConcreteJungle_Speed_300x250_H5_v1',
+        reporting_label: 'Concept: Concrete Jungle | Msg: Speed Focus',
         is_default: prev.length === 0,
+        // Visual assets – empty by default, strategist/producer fills in real URLs
         asset_slot_a_path: '',
         asset_slot_b_path: '',
         asset_slot_c_path: '',
         logo_asset_path: '',
+        // Copy & messaging – empty text slots ready for hooks/support/CTA
         copy_slot_a_text: '',
         copy_slot_b_text: '',
         copy_slot_c_text: '',
         legal_disclaimer_text: '',
+        // Design & style
         cta_button_text: 'Learn More',
         font_color_hex: '#FFFFFF',
         cta_bg_color_hex: '#14b8a6',
         background_color_hex: '#020617',
+        // Technical specs – defaults aligned to the example MPU HTML5 row
         platform_id: 'META',
-        placement_dimension: '',
-        asset_format_type: 'STATIC',
-        audience_id: '',
-        geo_targeting: '',
+        placement_dimension: '300x250',
+        asset_format_type: 'HTML5',
+        // Targeting & delivery
+        audience_id: 'AUD_001',
+        geo_targeting: 'US',
         date_start: '',
         date_end: '',
         trigger_condition: '',
+        // Destination & tracking
         destination_url: '',
         utm_suffix: '',
       },
@@ -666,7 +688,7 @@ export default function Home() {
 
   const exportFeedCsv = () => {
     if (!feedRows.length) return;
-    const headers = FEED_COLUMNS.map((c) => c.key as string);
+    const headers = feedFields.map((f) => f.key as string);
     const rows = feedRows.map((r) => headers.map((h) => (r as any)[h] ?? '').join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -699,6 +721,42 @@ export default function Home() {
     a.download = 'asset_feed_brief.txt';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const addCustomFeedField = () => {
+    const baseKey = 'custom_var_';
+    let idx = 1;
+    const existingKeys = new Set(feedFields.map((f) => f.key));
+    while (existingKeys.has(`${baseKey}${idx}`)) {
+      idx += 1;
+    }
+    const newKey = `${baseKey}${idx}`;
+    const newField: FeedFieldConfig = {
+      key: newKey,
+      label: `Custom Variable ${idx}`,
+      isCustom: true,
+    };
+    setFeedFields((prev) => [...prev, newField]);
+    setVisibleFeedFields((prev) => [...prev, newKey]);
+    // Existing rows will just have this field as undefined until edited
+  };
+
+  const toggleFeedField = (key: FeedFieldKey) => {
+    setVisibleFeedFields((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const deleteCustomFeedField = (key: FeedFieldKey) => {
+    setFeedFields((prev) => prev.filter((f) => f.key !== key));
+    setVisibleFeedFields((prev) => prev.filter((k) => k !== key));
+    setFeedRows((prev) =>
+      prev.map((row) => {
+        const clone = { ...row };
+        delete clone[key];
+        return clone;
+      }),
+    );
   };
 
   // Handle drag-to-resize for split view
@@ -1074,12 +1132,106 @@ export default function Home() {
   }
 
   async function generateProductionPlan() {
-    if (!matrixRows.length) {
-      alert('Add at least one row in the Strategy Matrix before generating a production plan.');
-      return;
-    }
-    if (!concepts.length) {
-      alert('Add at least one concept before generating a production plan.');
+    // POC mode: if upstream modules aren't wired yet, fall back to a
+    // deterministic demo Production Matrix so the board is never empty.
+    if (!matrixRows.length || !concepts.length) {
+      const demoConcept = concepts[0];
+      const demoBatch: ProductionBatch = {
+        id: 'DEMO-BATCH-001',
+        campaign_id: briefState.campaign_name || 'DEMO_CAMPAIGN',
+        strategy_segment_id: 'SEG-DEMO',
+        concept_id: demoConcept?.id || 'CON-DEMO',
+        batch_name: `${briefState.campaign_name || 'Demo Campaign'} – ${
+          demoConcept?.title || 'Night Reset Ritual'
+        }`,
+      };
+
+      const demoAssets: ProductionAsset[] = [
+        {
+          id: 'DEMO-ASSET-001',
+          batch_id: demoBatch.id,
+          asset_name: 'Loyalists_META_StoriesReels',
+          platform: 'Meta',
+          placement: 'Stories / Reels',
+          spec_dimensions: '1080x1920',
+          spec_details: {
+            id: 'META_STORY',
+            platform: 'Meta',
+            placement: 'Stories / Reels',
+            format_name: '9:16 Vertical',
+            dimensions: '1080x1920',
+            aspect_ratio: '9:16',
+            max_duration: 15,
+          },
+          status: 'Todo',
+          assignee: null,
+          asset_type: 'video',
+          visual_directive:
+            demoConcept?.description ||
+            'Top-funnel vertical story dramatizing the before/after of the core concept.',
+          copy_headline:
+            'Show the modular story in 6–15 seconds with a clear hero benefit in frame 1.',
+          source_asset_requirements:
+            'Master 9:16 video edit from hero shoot; export with safe zones respected.',
+          adaptation_instruction: 'Localize supers and end card by market; keep structure identical.',
+          file_url: null,
+        },
+        {
+          id: 'DEMO-ASSET-002',
+          batch_id: demoBatch.id,
+          asset_name: 'Loyalists_YT_Bumper',
+          platform: 'YouTube',
+          placement: 'Bumper',
+          spec_dimensions: '1920x1080',
+          spec_details: {
+            id: 'YT_BUMPER',
+            platform: 'YouTube',
+            placement: 'Bumper',
+            format_name: '6s 16:9 Bumper',
+            dimensions: '1920x1080',
+            aspect_ratio: '16:9',
+            max_duration: 6,
+          },
+          status: 'Todo',
+          assignee: null,
+          asset_type: 'video',
+          visual_directive:
+            'Ultra-tight 6s cut: cold open on payoff visual, 1 line of copy, brand lock-up.',
+          copy_headline: 'Land one clear benefit and mnemonic; no body copy.',
+          source_asset_requirements: '16:9 master edit; ensure framing works for TV and mobile.',
+          adaptation_instruction: 'Version CTA and logo lock-up per channel package.',
+          file_url: null,
+        },
+        {
+          id: 'DEMO-ASSET-003',
+          batch_id: demoBatch.id,
+          asset_name: 'Loyalists_DISPLAY_MPU',
+          platform: 'Google Display',
+          placement: 'MPU',
+          spec_dimensions: '300x250',
+          spec_details: {
+            id: 'DISPLAY_MPU',
+            platform: 'Google Display',
+            placement: 'MPU',
+            format_name: 'Medium Rectangle',
+            dimensions: '300x250',
+            aspect_ratio: '1.2:1',
+          },
+          status: 'Todo',
+          assignee: null,
+          asset_type: 'html5',
+          visual_directive:
+            'Static or lightweight HTML5 MPU; hero visual + 1–2 lines of copy and CTA button.',
+          copy_headline: 'Repurpose the master message into a short MPU-safe headline.',
+          source_asset_requirements: 'Layered PSD/FIG file or HTML5 components for animator.',
+          adaptation_instruction: 'Ensure legibility on small screens; avoid dense legal.',
+          file_url: null,
+        },
+      ];
+
+      setProductionBatch(demoBatch);
+      setProductionAssets(demoAssets);
+      setWorkspaceView('production');
       return;
     }
 
@@ -1141,7 +1293,53 @@ export default function Home() {
       setWorkspaceView('production');
     } catch (e: any) {
       console.error('Error generating production plan', e);
-      setProductionError(e?.message ?? 'Unable to generate production plan.');
+      // POC fallback: if backend is not wired yet in this environment,
+      // fall back to the same demo plan used when upstream modules are empty.
+      setProductionError(
+        e?.message ?? 'Unable to generate production plan from backend; showing demo plan.',
+      );
+      const demoConcept = concepts[0];
+      const demoBatch: ProductionBatch = {
+        id: 'DEMO-BATCH-001',
+        campaign_id: briefState.campaign_name || 'DEMO_CAMPAIGN',
+        strategy_segment_id: 'SEG-DEMO',
+        concept_id: demoConcept?.id || 'CON-DEMO',
+        batch_name: `${briefState.campaign_name || 'Demo Campaign'} – ${
+          demoConcept?.title || 'Night Reset Ritual'
+        }`,
+      };
+      const demoAssets: ProductionAsset[] = [
+        {
+          id: 'DEMO-ASSET-001',
+          batch_id: demoBatch.id,
+          asset_name: 'Loyalists_META_StoriesReels',
+          platform: 'Meta',
+          placement: 'Stories / Reels',
+          spec_dimensions: '1080x1920',
+          spec_details: {
+            id: 'META_STORY',
+            platform: 'Meta',
+            placement: 'Stories / Reels',
+            format_name: '9:16 Vertical',
+            dimensions: '1080x1920',
+          },
+          status: 'Todo',
+          assignee: null,
+          asset_type: 'video',
+          visual_directive:
+            demoConcept?.description ||
+            'Top-funnel vertical story dramatizing the before/after of the core concept.',
+          copy_headline:
+            'Show the modular story in 6–15 seconds with a clear hero benefit in frame 1.',
+          source_asset_requirements:
+            'Master 9:16 video edit from hero shoot; export with safe zones respected.',
+          adaptation_instruction: 'Localize supers and end card by market; keep structure identical.',
+          file_url: null,
+        },
+      ];
+      setProductionBatch(demoBatch);
+      setProductionAssets(demoAssets);
+      setWorkspaceView('production');
     } finally {
       setProductionLoading(false);
     }
@@ -2714,6 +2912,13 @@ export default function Home() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setShowFeedFieldConfig((prev) => !prev)}
+                      className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                    >
+                      Feed Fields
+                    </button>
+                    <button
+                      type="button"
                       onClick={exportFeedCsv}
                       disabled={!feedRows.length}
                       className="px-4 py-2 text-xs font-semibold rounded-full border border-slate-300 text-slate-700 bg-white disabled:opacity-50"
@@ -2733,6 +2938,62 @@ export default function Home() {
                     </p>
                   </section>
 
+                  {showFeedFieldConfig && (
+                    <div className="mt-1 mb-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm">
+                      <div className="flex items-center justify-between mb-2 gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                            Feed Fields
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Turn feed columns on/off and add custom variables for this asset feed.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addCustomFeedField}
+                          className="text-[11px] px-3 py-1 rounded-full border border-teal-400 text-teal-700 bg-white hover:bg-teal-50"
+                        >
+                          + Add custom field
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {feedFields.map((field) => {
+                          const checked = visibleFeedFields.includes(field.key);
+                          const isCustom = field.isCustom;
+                          return (
+                            <div
+                              key={field.key}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-full border ${
+                                checked
+                                  ? 'bg-white border-teal-500 text-teal-700 shadow-sm'
+                                  : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleFeedField(field.key)}
+                                className="outline-none"
+                              >
+                                {field.label}
+                              </button>
+                              {isCustom && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCustomFeedField(field.key)}
+                                  className="ml-1 text-[10px] text-slate-400 hover:text-red-500"
+                                  title="Remove custom field"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <section className="border border-slate-200 rounded-xl bg-white overflow-hidden">
                     <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
                       <p className="text-[11px] text-slate-500">
@@ -2745,24 +3006,28 @@ export default function Home() {
                       <table className="min-w-full text-[11px]">
                         <thead className="bg-slate-50 sticky top-0 z-10">
                           <tr>
-                            {FEED_COLUMNS.map((col) => (
+                            {feedFields
+                              .filter((col) => visibleFeedFields.includes(col.key))
+                              .map((col) => (
                               <th
                                 key={col.key as string}
                                 className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200"
                               >
                                 {col.label}
                               </th>
-                            ))}
+                              ))}
                           </tr>
                         </thead>
                         <tbody>
                           {feedRows.map((row, index) => (
                             <tr key={row.row_id} className="odd:bg-white even:bg-slate-50/40">
-                              {FEED_COLUMNS.map((col) => {
-                                const key = col.key;
+                              {feedFields
+                                .filter((col) => visibleFeedFields.includes(col.key))
+                                .map((col) => {
+                                  const key = col.key as keyof FeedRow;
                                 const cellValue = row[key];
 
-                                if (col.readOnly) {
+                                if (key === 'row_id') {
                                   return (
                                     <td
                                       key={key as string}
@@ -2791,16 +3056,16 @@ export default function Home() {
                                   );
                                 }
 
-                                return (
-                                  <td key={key as string} className="px-3 py-2 border-b border-slate-100">
-                                    <input
-                                      className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                      value={(cellValue ?? '') as string}
-                                      onChange={(e) => updateFeedCell(index, key, e.target.value)}
-                                    />
-                                  </td>
-                                );
-                              })}
+                                  return (
+                                    <td key={key as string} className="px-3 py-2 border-b border-slate-100">
+                                      <input
+                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                        value={(cellValue ?? '') as string}
+                                        onChange={(e) => updateFeedCell(index, key, e.target.value)}
+                                      />
+                                    </td>
+                                  );
+                                })}
                             </tr>
                           ))}
                         </tbody>

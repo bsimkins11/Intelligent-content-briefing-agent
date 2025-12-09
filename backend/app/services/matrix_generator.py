@@ -20,6 +20,68 @@ _BATCHES: dict[str, ProductionBatch] = {}
 _ASSETS: dict[str, ProductionAsset] = {}
 
 
+def _normalize_environment_ids(raw_envs: List[str]) -> List[str]:
+    """
+    POC-friendly normalisation for platform_environments.
+
+    The Strategy Matrix may store human-readable labels
+    (e.g. 'Meta: Stories/Reels (9:16)'), but the SPEC_LIBRARY is keyed
+    by environment IDs like 'META_STORY'.
+
+    This helper maps fuzzy labels to the closest spec IDs and falls back
+    to a sensible demo set if nothing matches.
+    """
+    normalized: List[str] = []
+
+    for raw in raw_envs:
+        label = (raw or "").strip()
+        upper = label.upper()
+
+        if not label:
+            continue
+
+        # Direct ID pass-through
+        if upper in {"META_STORY", "META_FEED", "YT_BUMPER", "DISPLAY_MPU", "DISPLAY_LEADER"}:
+            normalized.append(upper)
+            continue
+
+        # Fuzzy mappings based on common copy in the UI / strategist language
+        if "STOR" in upper or "REEL" in upper:
+            normalized.append("META_STORY")
+            continue
+
+        if "FEED" in upper and "META" in upper:
+            normalized.append("META_FEED")
+            continue
+
+        if "BUMPER" in upper or "6S" in upper or ("YOUTUBE" in upper and "16:9" in upper):
+            normalized.append("YT_BUMPER")
+            continue
+
+        if "300X250" in upper or "MPU" in upper:
+            normalized.append("DISPLAY_MPU")
+            continue
+
+        if "728X90" in upper or "LEADER" in upper:
+            normalized.append("DISPLAY_LEADER")
+            continue
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for eid in normalized:
+        if eid not in seen:
+            seen.add(eid)
+            deduped.append(eid)
+
+    # POC safety net: if after normalisation we still have nothing,
+    # return a small default pack so the board is never empty.
+    if not deduped:
+        return ["META_STORY", "YT_BUMPER", "DISPLAY_MPU"]
+
+    return deduped
+
+
 def generate_production_plan(
     campaign_id: str,
     strategy: StrategicMatrixRow,
@@ -35,17 +97,8 @@ def generate_production_plan(
     - For each environment ID, looks up a spec in SPEC_LIBRARY.
     - Creates a ProductionAsset ticket with spec + directive context.
     """
-    env_ids = strategy.platform_environments or []
-    if not env_ids:
-        # Nothing to expand – return an empty batch.
-        batch = ProductionBatch(
-            campaign_id=campaign_id,
-            strategy_segment_id=strategy.segment_id,
-            concept_id=concept.id,
-            batch_name=batch_name or f"{strategy.segment_name} – {concept.name}",
-        )
-        _BATCHES[batch.id] = batch
-        return batch, []
+    raw_envs = strategy.platform_environments or []
+    env_ids = _normalize_environment_ids(raw_envs)
 
     batch = ProductionBatch(
         campaign_id=campaign_id,
