@@ -724,16 +724,32 @@ export default function Home() {
   };
 
   const addCustomFeedField = () => {
-    const baseKey = 'custom_var_';
-    let idx = 1;
+    const rawLabel = window.prompt('Name this feed variable (e.g., Geo Cluster, Offer ID):');
+    if (!rawLabel) return;
+    const trimmed = rawLabel.trim();
+    if (!trimmed) return;
+
+    // Derive a slug key from the label
+    let baseKey = trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (!baseKey) {
+      baseKey = 'custom_var';
+    }
+
     const existingKeys = new Set(feedFields.map((f) => f.key));
-    while (existingKeys.has(`${baseKey}${idx}`)) {
+    let uniqueKey = baseKey;
+    let idx = 1;
+    while (existingKeys.has(uniqueKey)) {
+      uniqueKey = `${baseKey}_${idx}`;
       idx += 1;
     }
-    const newKey = `${baseKey}${idx}`;
+
+    const newKey = uniqueKey;
     const newField: FeedFieldConfig = {
       key: newKey,
-      label: `Custom Variable ${idx}`,
+      label: trimmed,
       isCustom: true,
     };
     setFeedFields((prev) => [...prev, newField]);
@@ -1534,10 +1550,10 @@ export default function Home() {
           </div>
           <div className="border-l border-slate-200 pl-6 h-10 flex flex-col justify-center">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-none mb-1">
-              Intelligent Briefing Agent
+              Intelligent Creative Cortex
             </h1>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
-              Powered by Transparent Partners
+              The creative brain of your campaign
             </p>
           </div>
         </div>
