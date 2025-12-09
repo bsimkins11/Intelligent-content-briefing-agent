@@ -82,6 +82,17 @@ type ModConBriefState = {
   status: 'Draft' | 'Approved';
 };
 
+type Spec = {
+  id: string;
+  platform: string;
+  placement: string;
+  width: number;
+  height: number;
+  orientation: string;
+  media_type: string;
+  notes?: string | null;
+};
+
 const INITIAL_MATRIX_LIBRARY: ContentMatrixTemplate[] = [
   {
     id: 'MTX-001',
@@ -413,7 +424,7 @@ export default function Home() {
   const [sampleTab, setSampleTab] = useState<'narrative' | 'matrix' | 'json'>('narrative');
   const [showLibrary, setShowLibrary] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts'>('brief');
+  const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts' | 'specs' | 'feed'>('brief');
   const [splitRatio, setSplitRatio] = useState(0.6); // kept for potential future resizing
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [rightTab, setRightTab] = useState<'builder' | 'board'>('builder');
@@ -433,6 +444,9 @@ export default function Home() {
     flight_dates: {},
     status: 'Draft',
   });
+  const [specs, setSpecs] = useState<Spec[]>([]);
+  const [loadingSpecs, setLoadingSpecs] = useState(false);
+  const [specsError, setSpecsError] = useState<string | null>(null);
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({
@@ -745,7 +759,7 @@ export default function Home() {
     }
   };
 
-  const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts') => {
+  const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts' | 'specs' | 'feed') => {
     setWorkspaceView(view);
 
     if (view === 'concepts') {
@@ -945,6 +959,29 @@ export default function Home() {
     setShowMatrixLibrary(true);
   }
 
+  async function loadSpecs() {
+    setLoadingSpecs(true);
+    setSpecsError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/specs`);
+      if (!res.ok) {
+        throw new Error(`Failed to load specs: ${res.status}`);
+      }
+      const data = await res.json();
+      setSpecs(data || []);
+    } catch (e: any) {
+      setSpecsError(e?.message ?? 'Unable to load specs.');
+    } finally {
+      setLoadingSpecs(false);
+    }
+  }
+
+  useEffect(() => {
+    if (workspaceView === 'specs' && specs.length === 0 && !loadingSpecs) {
+      loadSpecs();
+    }
+  }, [workspaceView]);
+
   return (
     <main
       ref={containerRef}
@@ -1009,6 +1046,26 @@ export default function Home() {
               }`}
             >
               Concepts
+            </button>
+            <button
+              onClick={() => switchWorkspace('specs')}
+              className={`text-[11px] px-2 py-1 rounded-full ${
+                workspaceView === 'specs'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Specs
+            </button>
+            <button
+              onClick={() => switchWorkspace('feed')}
+              className={`text-[11px] px-2 py-1 rounded-full ${
+                workspaceView === 'feed'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Feed
             </button>
           </div>
           <button
@@ -1344,7 +1401,13 @@ export default function Home() {
           <div className="px-6 py-5 border-b border-gray-100 bg-white flex justify-between items-center select-none">
             <div className="flex items-center gap-4">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                {workspaceView === 'matrix' ? 'Production Workspace' : 'Concept Workspace'}
+                {workspaceView === 'matrix'
+                  ? 'Production Workspace'
+                  : workspaceView === 'concepts'
+                  ? 'Concept Workspace'
+                  : workspaceView === 'specs'
+                  ? 'Spec Library'
+                  : 'Content Feed'}
               </h2>
               {workspaceView === 'concepts' && (
                 <div className="ml-4 flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
@@ -2016,6 +2079,107 @@ export default function Home() {
                         ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {workspaceView === 'specs' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Spec Library
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Reference specs for the most common digital placements across Meta, TikTok, YouTube, GDN, and more.
+                      </p>
+                    </div>
+                  </div>
+                  {loadingSpecs && (
+                    <p className="text-[11px] text-slate-400">Loading specs…</p>
+                  )}
+                  {specsError && (
+                    <p className="text-[11px] text-red-500">{specsError}</p>
+                  )}
+                  {!loadingSpecs && !specsError && (
+                    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                      <div className="max-h-[520px] overflow-auto">
+                        <table className="min-w-full text-[11px]">
+                          <thead className="bg-slate-50 sticky top-0 z-10">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Platform
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Placement
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Size
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Orientation
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Media Type
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Notes
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {specs.map((spec) => (
+                              <tr key={spec.id} className="odd:bg-white even:bg-slate-50/40 align-top">
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.platform}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.placement}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.width}×{spec.height}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.orientation}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.media_type}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.notes}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {workspaceView === 'feed' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Content Feed
+                      </h3>
+                      <p className="text-[11px] text-slate-500 max-w-xl">
+                        This module reviews the dynamic creative feed before it’s handed off to activation platforms.
+                        For the demo, open the dedicated Feed Review workspace.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.open('/feed-review', '_blank')}
+                      className="px-4 py-2 text-xs font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700"
+                    >
+                      Open Feed Review
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    The Feed Review workspace lets you ingest a media plan, combine it with strategy and concepts, and export a clean DCO CSV.
+                  </p>
                 </div>
               )}
             </div>
