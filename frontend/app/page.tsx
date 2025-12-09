@@ -3003,7 +3003,7 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="max-h-[480px] overflow-auto">
-                      <table className="min-w-full text-[11px]">
+                      <table className="w-full text-[11px] table-auto">
                         <thead className="bg-slate-50 sticky top-0 z-10">
                           <tr>
                             {feedFields
@@ -3057,9 +3057,9 @@ export default function Home() {
                                 }
 
                                   return (
-                                    <td key={key as string} className="px-3 py-2 border-b border-slate-100">
+                                    <td key={key as string} className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                                       <input
-                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                        className="border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
                                         value={(cellValue ?? '') as string}
                                         onChange={(e) => updateFeedCell(index, key, e.target.value)}
                                       />
