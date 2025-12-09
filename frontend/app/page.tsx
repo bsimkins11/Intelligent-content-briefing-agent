@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
 type Message = {
   role: 'user' | 'assistant';
   content: string;
@@ -69,6 +71,15 @@ type ContentMatrixTemplate = {
   name: string;
   description: string;
   rows: MatrixRow[];
+};
+
+type ModConBriefState = {
+  campaign_name: string;
+  smp: string;
+  audiences: string[];
+  kpis: string[];
+  flight_dates: Record<string, string>;
+  status: 'Draft' | 'Approved';
 };
 
 const INITIAL_MATRIX_LIBRARY: ContentMatrixTemplate[] = [
@@ -414,6 +425,14 @@ export default function Home() {
   const [showMatrixLibrary, setShowMatrixLibrary] = useState(false);
   const [matrixLibrary, setMatrixLibrary] = useState<ContentMatrixTemplate[]>(INITIAL_MATRIX_LIBRARY);
   const [briefFields, setBriefFields] = useState<BriefFieldConfig[]>(BASE_BRIEF_FIELDS);
+  const [briefState, setBriefState] = useState<ModConBriefState>({
+    campaign_name: 'Intelligent Content System – Demo Campaign',
+    smp: '',
+    audiences: [],
+    kpis: [],
+    flight_dates: {},
+    status: 'Draft',
+  });
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({
@@ -512,16 +531,41 @@ export default function Home() {
     }
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+      if (workspaceView === 'brief') {
+        const res = await fetch(`${API_BASE_URL}/brief/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            current_state: briefState,
+            chat_log: newHistory,
+          }),
+        });
+        const data = await res.json();
+        setMessages([...newHistory, { role: 'assistant', content: data.reply }]);
+        if (data.state) {
+          const nextBrief = data.state as ModConBriefState;
+          setBriefState(nextBrief);
+          setPreviewPlan((prev: any) => ({
+            ...prev,
+            campaign_name: nextBrief.campaign_name || prev.campaign_name,
+            single_minded_proposition: nextBrief.smp || prev.single_minded_proposition,
+            primary_audience:
+              (Array.isArray(nextBrief.audiences) && nextBrief.audiences.join(', ')) ||
+              prev.primary_audience,
+          }));
+        }
+      } else {
+        const res = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             history: newHistory,
-            current_plan: previewPlan 
-        }),
-      });
-      const data = await res.json();
-      setMessages([...newHistory, { role: 'assistant', content: data.reply }]);
+            current_plan: previewPlan,
+          }),
+        });
+        const data = await res.json();
+        setMessages([...newHistory, { role: 'assistant', content: data.reply }]);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -570,7 +614,7 @@ export default function Home() {
 
         await sendMessage(userMessage);
       } else {
-        const res = await fetch('http://localhost:8000/upload', {
+        const res = await fetch(`${API_BASE_URL}/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -685,7 +729,7 @@ export default function Home() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/export/${format}`, {
+      const res = await fetch(`${API_BASE_URL}/export/${format}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: planToSend }),

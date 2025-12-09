@@ -2,6 +2,11 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Literal
 from app.agent_core import process_message
+from app.feed_generator import generate_dco_feed
+from app.api.brief_routes import router as brief_router
+from app.api.matrix_routes import router as matrix_router
+from app.api.concept_routes import router as concept_router
+from app.api.spec_routes import router as spec_router
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
 import os
@@ -21,6 +26,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(brief_router, prefix="/brief", tags=["brief"])
+app.include_router(matrix_router, prefix="/matrix", tags=["matrix"])
+app.include_router(concept_router, prefix="/concepts", tags=["concepts"])
+app.include_router(spec_router, prefix="/specs", tags=["specs"])
 
 class ChatMessage(BaseModel):
     role: str
@@ -47,6 +57,23 @@ class GenerateAssetResponse(BaseModel):
     status: str
     # Placeholder for future URLs or IDs returned from GCP creative services.
     asset_url: Optional[str] = None
+
+
+class DCOFeedRow(BaseModel):
+  Unique_ID: str
+  Headline: str
+  Image_URL: str
+  Exit_URL: str
+
+
+class GenerateFeedRequest(BaseModel):
+    audience_strategy: List[Dict[str, Any]]
+    asset_list: List[Dict[str, Any]]
+    media_plan_rows: List[Dict[str, Any]]
+
+
+class GenerateFeedResponse(BaseModel):
+    feed: List[DCOFeedRow]
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -84,6 +111,28 @@ async def generate_asset(request: GenerateAssetRequest):
             status="queued",
             asset_url=None,
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/generate-feed", response_model=GenerateFeedResponse)
+async def generate_feed(request: GenerateFeedRequest) -> GenerateFeedResponse:
+    """
+    Turn strategy + concepts + media plan rows into a structured DCO feed.
+
+    This is intentionally simple: it walks the media rows and, for each one,
+    looks up the best-matching headline (from `audience_strategy`) and image /
+    exit URL (from `asset_list`) by audience. The exact shapes of those inputs
+    can evolve over time as long as they expose reasonable `audience` /
+    `headline` / `image_url` / `exit_url` style keys.
+    """
+    try:
+        feed_rows = generate_dco_feed(
+            audience_strategy=request.audience_strategy,
+            asset_list=request.asset_list,
+            media_plan_rows=request.media_plan_rows,
+        )
+        return GenerateFeedResponse(feed=[DCOFeedRow(**row) for row in feed_rows])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
