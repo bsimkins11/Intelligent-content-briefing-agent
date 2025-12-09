@@ -108,6 +108,32 @@ type Spec = {
   notes?: string | null;
 };
 
+type ProductionBatch = {
+  id: string;
+  campaign_id: string;
+  strategy_segment_id: string;
+  concept_id: string;
+  batch_name: string;
+};
+
+type ProductionAsset = {
+  id: string;
+  batch_id: string;
+  asset_name: string;
+  platform: string;
+  placement: string;
+  spec_dimensions: string;
+  spec_details: any;
+  status: string;
+  assignee?: string | null;
+  asset_type: string;
+  visual_directive: string;
+  copy_headline: string;
+  source_asset_requirements?: string | null;
+  adaptation_instruction?: string | null;
+  file_url?: string | null;
+};
+
 const INITIAL_MATRIX_LIBRARY: ContentMatrixTemplate[] = [
   {
     id: 'MTX-001',
@@ -439,7 +465,7 @@ export default function Home() {
   const [sampleTab, setSampleTab] = useState<'narrative' | 'matrix' | 'json'>('narrative');
   const [showLibrary, setShowLibrary] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts' | 'specs' | 'feed'>('brief');
+  const [workspaceView, setWorkspaceView] = useState<'brief' | 'matrix' | 'concepts' | 'production' | 'specs' | 'feed'>('brief');
   const [splitRatio, setSplitRatio] = useState(0.6); // kept for potential future resizing
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [rightTab, setRightTab] = useState<'builder' | 'board'>('builder');
@@ -462,6 +488,11 @@ export default function Home() {
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [specsError, setSpecsError] = useState<string | null>(null);
+  const [productionBatch, setProductionBatch] = useState<ProductionBatch | null>(null);
+  const [productionAssets, setProductionAssets] = useState<ProductionAsset[]>([]);
+  const [productionLoading, setProductionLoading] = useState(false);
+  const [productionError, setProductionError] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<ProductionAsset | null>(null);
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({
@@ -774,7 +805,7 @@ export default function Home() {
     }
   };
 
-  const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts' | 'specs' | 'feed') => {
+  const switchWorkspace = (view: 'brief' | 'matrix' | 'concepts' | 'production' | 'specs' | 'feed') => {
     setWorkspaceView(view);
 
     if (view === 'concepts') {
@@ -877,6 +908,102 @@ export default function Home() {
       });
     } catch (e) {
       console.error('Error calling /concepts/generate', e);
+    }
+  }
+
+  async function generateProductionPlan() {
+    if (!matrixRows.length) {
+      alert('Add at least one row in the Strategy Matrix before generating a production plan.');
+      return;
+    }
+    if (!concepts.length) {
+      alert('Add at least one concept before generating a production plan.');
+      return;
+    }
+
+    const strategyRow = matrixRows[0] || {};
+    const concept = concepts[0];
+
+    const platformEnvs = (strategyRow.platform_environments || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const strategyPayload = {
+      segment_source_type: strategyRow.segment_source_type || '1st Party (CRM/Email List)',
+      segment_id: strategyRow.segment_id || 'SEG-DEMO',
+      segment_name: strategyRow.segment_name || 'Demo Segment',
+      segment_size: strategyRow.segment_size || '',
+      priority_level: strategyRow.priority_level || 'Tier 1 (Bespoke)',
+      segment_description: strategyRow.segment_description || '',
+      key_insight: strategyRow.key_insight || '',
+      current_perception: strategyRow.current_perception || '',
+      desired_perception: strategyRow.desired_perception || '',
+      primary_message_pillar: strategyRow.primary_message_pillar || '',
+      call_to_action_objective: strategyRow.call_to_action_objective || 'Learn More',
+      tone_guardrails: strategyRow.tone_guardrails || '',
+      platform_environments: platformEnvs.length ? platformEnvs : ['META_STORY'],
+      contextual_triggers: strategyRow.contextual_triggers || '',
+      asset_id: strategyRow.asset_id,
+      specs_lookup_key: strategyRow.specs_lookup_key,
+      notes: strategyRow.notes,
+    };
+
+    const conceptPayload = {
+      id: concept.id,
+      name: concept.title || 'Untitled concept',
+      visual_description: concept.description || '',
+      components: [],
+    };
+
+    setProductionLoading(true);
+    setProductionError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/production/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign_id: briefState.campaign_name || 'DEMO_CAMPAIGN',
+          strategy: strategyPayload,
+          concept: conceptPayload,
+          batch_name: `${strategyPayload.segment_name} – ${conceptPayload.name}`,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      setProductionBatch(data.batch || null);
+      setProductionAssets(data.assets || []);
+      setWorkspaceView('production');
+    } catch (e: any) {
+      console.error('Error generating production plan', e);
+      setProductionError(e?.message ?? 'Unable to generate production plan.');
+    } finally {
+      setProductionLoading(false);
+    }
+  }
+
+  async function updateProductionStatus(assetId: string, status: string) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/production/asset/${assetId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      const updated = data.asset as ProductionAsset;
+      setProductionAssets((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      if (selectedAsset && selectedAsset.id === updated.id) {
+        setSelectedAsset(updated);
+      }
+    } catch (e) {
+      console.error('Error updating asset status', e);
     }
   }
 
@@ -1097,6 +1224,16 @@ export default function Home() {
               }`}
             >
               Concepts
+            </button>
+            <button
+              onClick={() => switchWorkspace('production')}
+              className={`text-[11px] px-2 py-1 rounded-full ${
+                workspaceView === 'production'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Production
             </button>
             <button
               onClick={() => switchWorkspace('specs')}
@@ -1453,9 +1590,11 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 {workspaceView === 'matrix'
-                  ? 'Production Workspace'
+                  ? 'Strategy Matrix'
                   : workspaceView === 'concepts'
                   ? 'Concept Workspace'
+                  : workspaceView === 'production'
+                  ? 'Production Matrix'
                   : workspaceView === 'specs'
                   ? 'Spec Library'
                   : 'Content Feed'}
@@ -1668,6 +1807,215 @@ export default function Home() {
                     </div>
                   )}
                 </>
+              )}
+
+              {workspaceView === 'production' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Production Matrix
+                      </h3>
+                      <p className="text-[11px] text-slate-500 max-w-xl">
+                        Generate and manage the Bill of Materials for this campaign. Each card is a single
+                        asset to be built, with full spec details for editors and producers.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={generateProductionPlan}
+                      disabled={productionLoading}
+                      className="px-4 py-2 text-xs font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
+                    >
+                      {productionLoading ? 'Generating…' : productionBatch ? 'Regenerate Plan' : 'Generate Plan'}
+                    </button>
+                  </div>
+                  {productionError && (
+                    <p className="text-[11px] text-red-500">{productionError}</p>
+                  )}
+                  {!productionBatch || productionAssets.length === 0 ? (
+                    <div className="mt-12 flex flex-col items-center justify-center text-center text-slate-400 gap-3">
+                      <p className="text-sm max-w-xs">
+                        Start by generating a production plan from the first Strategy card and Concept. You can
+                        then move assets through Todo → In Progress → Review → Approved.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {['Todo', 'In_Progress', 'Review', 'Approved'].map((col) => (
+                        <div key={col} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              {col === 'In_Progress' ? 'In Progress' : col}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {productionAssets.filter((a) => a.status === col).length}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {productionAssets
+                              .filter((a) => a.status === col)
+                              .map((asset) => (
+                                <button
+                                  key={asset.id}
+                                  type="button"
+                                  onClick={() => setSelectedAsset(asset)}
+                                  className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                        {asset.asset_name}
+                                      </p>
+                                      <p className="text-[10px] text-slate-500 truncate">
+                                        {asset.platform} · {asset.placement}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
+                                      {asset.asset_type}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedAsset && (
+                    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
+                      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200 max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-900 truncate">
+                              {selectedAsset.asset_name}
+                            </h3>
+                            <p className="text-[11px] text-slate-500">
+                              {selectedAsset.platform} · {selectedAsset.placement} ·{' '}
+                              {selectedAsset.spec_dimensions}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAsset(null)}
+                            className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Spec Sheet
+                            </h4>
+                            <div className="text-[11px] text-slate-600 space-y-1">
+                              <p>
+                                <span className="font-semibold">Platform:</span> {selectedAsset.spec_details?.platform}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Placement:</span>{' '}
+                                {selectedAsset.spec_details?.placement}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Format:</span>{' '}
+                                {selectedAsset.spec_details?.format_name}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Dimensions:</span>{' '}
+                                {selectedAsset.spec_details?.dimensions}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Aspect Ratio:</span>{' '}
+                                {selectedAsset.spec_details?.aspect_ratio}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Max Duration:</span>{' '}
+                                {selectedAsset.spec_details?.max_duration || 0}s
+                              </p>
+                              <p>
+                                <span className="font-semibold">File Type:</span>{' '}
+                                {selectedAsset.spec_details?.file_type}
+                              </p>
+                              {selectedAsset.spec_details?.safe_zone && (
+                                <p>
+                                  <span className="font-semibold">Safe Zone:</span>{' '}
+                                  {selectedAsset.spec_details.safe_zone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Creative Directives
+                            </h4>
+                            <div className="space-y-1 text-[11px] text-slate-700">
+                              <p>
+                                <span className="font-semibold">Visual Directive:</span>
+                                <br />
+                                {selectedAsset.visual_directive}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Copy Headline:</span>
+                                <br />
+                                {selectedAsset.copy_headline}
+                              </p>
+                              {selectedAsset.source_asset_requirements && (
+                                <p>
+                                  <span className="font-semibold">Source Requirements:</span>
+                                  <br />
+                                  {selectedAsset.source_asset_requirements}
+                                </p>
+                              )}
+                              {selectedAsset.adaptation_instruction && (
+                                <p>
+                                  <span className="font-semibold">Adaptation Instruction:</span>
+                                  <br />
+                                  {selectedAsset.adaptation_instruction}
+                                </p>
+                              )}
+                              {selectedAsset.file_url && (
+                                <p>
+                                  <span className="font-semibold">File URL:</span>
+                                  <br />
+                                  {selectedAsset.file_url}
+                                </p>
+                              )}
+                            </div>
+                            <div className="mt-3 space-y-1">
+                              <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                                Status
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {['Todo', 'In_Progress', 'Review', 'Approved'].map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => updateProductionStatus(selectedAsset.id, s)}
+                                    className={`px-2.5 py-1 text-[11px] rounded-full border ${
+                                      selectedAsset.status === s
+                                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700'
+                                    }`}
+                                  >
+                                    {s === 'In_Progress' ? 'In Progress' : s}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-[10px] text-slate-500 flex justify-between">
+                          <span>
+                            Batch: {productionBatch?.batch_name} · Campaign: {productionBatch?.campaign_id}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {showMatrixLibrary && (
