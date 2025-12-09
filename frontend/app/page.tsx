@@ -36,12 +36,29 @@ type MatrixFieldConfig = {
 };
 
 const BASE_MATRIX_FIELDS: MatrixFieldConfig[] = [
+  // Execution anchor
   { key: 'id', label: 'Asset ID' },
-  { key: 'audience_segment', label: 'Audience' },
-  { key: 'funnel_stage', label: 'Stage' },
-  { key: 'trigger', label: 'Trigger' },
+
+  // SECTION A: The Signal (Who & When)
+  { key: 'audience_segment', label: 'Segment ID' },
+  { key: 'funnel_stage', label: 'Lifecycle Stage' },
+  { key: 'trigger', label: 'Context Trigger' },
+
+  // SECTION B: The Hook (Psychology & Strategy)
+  { key: 'psych_driver', label: 'Psych Driver' },
+  { key: 'emotional_tone', label: 'Emotional Tone' },
+  { key: 'buying_barrier', label: 'Buying Barrier' },
+
+  // SECTION C: The Payload (Creative Directives)
+  { key: 'visual_archetype', label: 'Visual Archetype' },
+  { key: 'messaging_angle', label: 'Messaging Angle' },
+  { key: 'dynamic_elements', label: 'Dynamic Elements' },
+
+  // Channel / format execution details
   { key: 'channel', label: 'Channel' },
   { key: 'format', label: 'Format' },
+
+  // Legacy / execution-level fields that still help production
   { key: 'message', label: 'Message' },
   { key: 'variant', label: 'Variant' },
   { key: 'source_type', label: 'Source Type' },
