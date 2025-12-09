@@ -31,12 +31,50 @@ type FeedRow = {
   utm_suffix?: string | null;
 };
 
+const FEED_COLUMNS: { key: keyof FeedRow; label: string; readOnly?: boolean }[] = [
+  { key: 'row_id', label: 'Row ID', readOnly: true },
+  { key: 'creative_filename', label: 'Creative Filename' },
+  { key: 'reporting_label', label: 'Reporting Label' },
+  { key: 'is_default', label: 'Is Default?' },
+  { key: 'asset_slot_a_path', label: 'Asset Slot A (Primary)' },
+  { key: 'asset_slot_b_path', label: 'Asset Slot B (Secondary)' },
+  { key: 'asset_slot_c_path', label: 'Asset Slot C (Tertiary)' },
+  { key: 'logo_asset_path', label: 'Logo Asset Path' },
+  { key: 'copy_slot_a_text', label: 'Copy Slot A (Hook)' },
+  { key: 'copy_slot_b_text', label: 'Copy Slot B (Support)' },
+  { key: 'copy_slot_c_text', label: 'Copy Slot C (CTA)' },
+  { key: 'legal_disclaimer_text', label: 'Legal Disclaimer' },
+  { key: 'cta_button_text', label: 'CTA Button Text' },
+  { key: 'font_color_hex', label: 'Font Color Hex' },
+  { key: 'cta_bg_color_hex', label: 'CTA BG Color Hex' },
+  { key: 'background_color_hex', label: 'Background Color Hex' },
+  { key: 'platform_id', label: 'Platform ID' },
+  { key: 'placement_dimension', label: 'Placement Dimension' },
+  { key: 'asset_format_type', label: 'Asset Format Type' },
+  { key: 'audience_id', label: 'Audience ID' },
+  { key: 'geo_targeting', label: 'Geo Targeting' },
+  { key: 'date_start', label: 'Date Start' },
+  { key: 'date_end', label: 'Date End' },
+  { key: 'trigger_condition', label: 'Trigger Condition' },
+  { key: 'destination_url', label: 'Destination URL' },
+  { key: 'utm_suffix', label: 'UTM Suffix' },
+];
+
 export default function FeedReviewPage() {
   const [feed, setFeed] = useState<FeedRow[]>([]);
 
   const updateFeedCell = (index: number, key: keyof FeedRow, value: string) => {
     setFeed((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
+    );
+  };
+
+  const setDefaultRow = (index: number) => {
+    setFeed((prev) =>
+      prev.map((row, i) => ({
+        ...row,
+        is_default: i === index,
+      })),
     );
   };
 
@@ -187,71 +225,62 @@ export default function FeedReviewPage() {
             <table className="min-w-full text-[11px]">
               <thead className="bg-slate-50 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Row ID
-                  </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Creative Filename
-                  </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Reporting Label
-                  </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Platform / Dimension
-                  </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Asset Type
-                  </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
-                    Destination URL
-                  </th>
+                  {FEED_COLUMNS.map((col) => (
+                    <th
+                      key={col.key as string}
+                      className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {feed.map((row, index) => (
                   <tr key={row.row_id} className="odd:bg-white even:bg-slate-50/40">
-                    <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700">
-                      {row.row_id}
-                    </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <input
-                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                        value={row.creative_filename}
-                        onChange={(e) => updateFeedCell(index, 'creative_filename', e.target.value)}
-                      />
-                    </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <input
-                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                        value={row.reporting_label}
-                        onChange={(e) => updateFeedCell(index, 'reporting_label', e.target.value)}
-                      />
-                    </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <input
-                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                        value={row.platform_id + ' · ' + row.placement_dimension}
-                        onChange={(e) => {
-                          const [platformPart, dimensionPart] = e.target.value.split('·').map((s) => s.trim());
-                          updateFeedCell(index, 'platform_id', platformPart || '');
-                          updateFeedCell(index, 'placement_dimension', dimensionPart || '');
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <input
-                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                        value={row.asset_format_type}
-                        onChange={(e) => updateFeedCell(index, 'asset_format_type', e.target.value)}
-                      />
-                    </td>
-                    <td className="px-3 py-2 border-b border-slate-100">
-                      <input
-                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                        value={row.destination_url ?? ''}
-                        onChange={(e) => updateFeedCell(index, 'destination_url', e.target.value)}
-                      />
-                    </td>
+                    {FEED_COLUMNS.map((col) => {
+                      const key = col.key;
+                      const cellValue = row[key];
+
+                      if (col.readOnly) {
+                        return (
+                          <td
+                            key={key as string}
+                            className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700"
+                          >
+                            {String(cellValue ?? '')}
+                          </td>
+                        );
+                      }
+
+                      if (key === 'is_default') {
+                        return (
+                          <td key={key as string} className="px-3 py-2 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => setDefaultRow(index)}
+                              className={`px-2 py-1 rounded-full text-[10px] ${
+                                row.is_default
+                                  ? 'bg-teal-600 text-white'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                              }`}
+                            >
+                              {row.is_default ? 'Default' : 'Make default'}
+                            </button>
+                          </td>
+                        );
+                      }
+
+                      return (
+                        <td key={key as string} className="px-3 py-2 border-b border-slate-100">
+                          <input
+                            className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                            value={(cellValue ?? '') as string}
+                            onChange={(e) => updateFeedCell(index, key, e.target.value)}
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
