@@ -3,5 +3,8 @@
   "private": true,
   "scripts": {
     "build": "echo 'Building...'"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }

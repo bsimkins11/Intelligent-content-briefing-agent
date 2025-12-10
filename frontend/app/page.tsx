@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import Image from 'next/image';
 
 // Default to same-origin in the browser; fall back to localhost for local dev/server-side
@@ -54,7 +55,7 @@ const BASE_MATRIX_FIELDS: MatrixFieldConfig[] = [
   // PRIMARY FIELDS – Identity Block
   { key: 'segment_source', label: 'Segment Source' },
   { key: 'segment_id', label: 'Segment ID' },
-  { key: 'segment_name', label: 'Segment Name' },
+  { key: 'segment_name', label: 'Audience / Segment' },
   { key: 'segment_size', label: 'Segment Size' },
   { key: 'priority_level', label: 'Priority Level' },
 
@@ -257,6 +258,77 @@ const BASE_FEED_FIELDS: FeedFieldConfig[] = [
   { key: 'trigger_condition', label: 'Trigger Condition' },
   { key: 'destination_url', label: 'Destination URL' },
   { key: 'utm_suffix', label: 'UTM Suffix' },
+];
+
+const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
+  {
+    segment_source: 'CRM + site analytics',
+    segment_id: 'RUN-LOYAL',
+    segment_name: 'Run Club Loyalists',
+    segment_size: '48k',
+    priority_level: 'Tier 1 (Bespoke)',
+    segment_description: 'Members logging >30 miles/week; purchase 2+ pairs/year.',
+    key_insight: 'They chase PRs and want proof that lighter shoes = faster splits.',
+    current_perception: 'Our shoes are reliable daily trainers.',
+    desired_perception: 'We are their fastest race-day partner.',
+    primary_message_pillar: 'Speed with evidence (race times, athlete data).',
+    call_to_action_objective: 'Shop the race-day lineup',
+    tone_guardrails: 'Confident, not cocky. Evidence-led.',
+    platform_environments: 'Meta, TikTok, YouTube',
+    contextual_triggers: 'Race calendar, long-run days',
+    notes: 'Use Run Club UGC and Strava overlays.',
+  },
+  {
+    segment_source: 'Prospecting lookalikes',
+    segment_id: 'RUN-NEW',
+    segment_name: 'New to Running',
+    segment_size: '310k',
+    priority_level: 'Tier 2',
+    segment_description: 'Brand-new runners seeking first “real” running shoe.',
+    key_insight: 'They fear injury and decision overwhelm more than price.',
+    current_perception: 'Unsure which model fits their gait/goals.',
+    desired_perception: 'We make choosing easy and reduce injury risk.',
+    primary_message_pillar: 'Confidence + guidance (fit quiz, store fitting).',
+    call_to_action_objective: 'Take the fit quiz',
+    tone_guardrails: 'Encouraging, beginner-safe, avoid jargon.',
+    platform_environments: 'Meta, YouTube, Retail/CRM',
+    contextual_triggers: 'New year, spring training, first 5k sign-up',
+    notes: 'Lead with cushioning/comfort visuals; invite to quiz.',
+  },
+  {
+    segment_source: 'Paid social + search retargeting',
+    segment_id: 'RUN-TRAIL',
+    segment_name: 'Trail Explorers',
+    segment_size: '95k',
+    priority_level: 'Tier 2',
+    segment_description: 'Outdoor-focused runners adding weekly trail miles.',
+    key_insight: 'They want grip + stability without losing speed.',
+    current_perception: 'We are road-first; unsure about trail cred.',
+    desired_perception: 'We’re their trusted trail weapon—light, grippy, stable.',
+    primary_message_pillar: 'Grip + stability proven on technical terrain.',
+    call_to_action_objective: 'Shop trail collection',
+    tone_guardrails: 'Grounded, technical clarity; avoid hype.',
+    platform_environments: 'YouTube, TikTok, Open Web',
+    contextual_triggers: 'Weekend trail plans, park visits, REI-style content',
+    notes: 'Use muddy/gritty textures; show outsole close-ups.',
+  },
+];
+
+const AUDIENCE_IMPORT_FIELDS: { key: MatrixFieldKey; label: string }[] = [
+  { key: 'segment_name', label: 'Audience / Segment' },
+  { key: 'segment_id', label: 'Segment ID' },
+  { key: 'segment_size', label: 'Segment Size' },
+  { key: 'priority_level', label: 'Priority Level' },
+  { key: 'segment_description', label: 'Segment Description' },
+  { key: 'key_insight', label: 'Key Insight' },
+  { key: 'current_perception', label: 'Current Perception' },
+  { key: 'desired_perception', label: 'Desired Perception' },
+  { key: 'primary_message_pillar', label: 'Primary Message Pillar' },
+  { key: 'call_to_action_objective', label: 'CTA Objective' },
+  { key: 'tone_guardrails', label: 'Tone Guardrails' },
+  { key: 'platform_environments', label: 'Platform Environments' },
+  { key: 'contextual_triggers', label: 'Contextual Triggers' },
+  { key: 'notes', label: 'Notes' },
 ];
 
 const INITIAL_MATRIX_LIBRARY: ContentMatrixTemplate[] = [
@@ -555,6 +627,36 @@ const DESTINATION_OPTIONS_BY_PLATFORM: Record<string, string[]> = {
   Mobile: ['In-App Banner', 'In-App Interstitial'],
 };
 
+const deriveProductionRowsFromMatrix = (rows: MatrixRow[]): ProductionMatrixLine[] => {
+  return rows.map((r, idx) => {
+    const dests: DestinationEntry[] = [];
+    const platforms = (r.platform_environments || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    platforms.forEach((p) => {
+      const options = DESTINATION_OPTIONS_BY_PLATFORM[p] || [p];
+      if (options.length) {
+        dests.push({ name: options[0] });
+      }
+    });
+    return {
+      id: `PR-${(idx + 1).toString().padStart(3, '0')}`,
+      audience: r.segment_name || `Audience ${idx + 1}`,
+      concept_id: '',
+      spec_id: '',
+      destinations: dests,
+      notes: r.notes || '',
+      is_feed: false,
+      feed_template: '',
+      template_id: '',
+      feed_id: '',
+      feed_asset_id: '',
+      production_details: '',
+    };
+  });
+};
+
 const HISTORICAL_BRIEFS: HistoricalBrief[] = [
   {
     id: "HB-001",
@@ -735,6 +837,11 @@ export default function Home() {
       production_details?: string;
     };
   }>({});
+  const [audienceImportOpen, setAudienceImportOpen] = useState(false);
+  const [audienceImportColumns, setAudienceImportColumns] = useState<string[]>([]);
+  const [audienceImportRows, setAudienceImportRows] = useState<any[]>([]);
+  const [audienceImportMapping, setAudienceImportMapping] = useState<Record<string, string>>({});
+  const audienceFileInputRef = useRef<HTMLInputElement | null>(null);
   const [newSpecPlatform, setNewSpecPlatform] = useState('');
   const [newSpecPlacement, setNewSpecPlacement] = useState('');
   const [newSpecWidth, setNewSpecWidth] = useState('');
@@ -750,55 +857,9 @@ export default function Home() {
   const [showPlan, setShowPlan] = useState(false);
   const [showJobs, setShowJobs] = useState(false);
   const [showBoard, setShowBoard] = useState(true);
-  const [productionMatrixRows, setProductionMatrixRows] = useState<ProductionMatrixLine[]>([
-    {
-      id: 'PR-001',
-      audience: 'Summer Sale (Fast)',
-      concept_id: '',
-      spec_id: 'TIKTOK_IN_FEED_9x16',
-      destinations: [
-        { name: 'TikTok' },
-        { name: 'Instagram' },
-        { name: 'Shorts' },
-        { name: 'Snap' },
-      ],
-      notes: '15s vertical; keep supers high.',
-      is_feed: false,
-      feed_template: '',
-      template_id: '',
-      feed_id: '',
-      feed_asset_id: '',
-      production_details: '',
-    },
-    {
-      id: 'PR-002',
-      audience: 'Summer Sale (Fast)',
-      concept_id: '',
-      spec_id: 'YOUTUBE_INSTREAM_16x9',
-      destinations: [{ name: 'YouTube' }, { name: 'CTV' }, { name: 'X' }],
-      notes: '16:9 instream cut; loud/clear open.',
-      is_feed: false,
-      feed_template: '',
-      template_id: '',
-      feed_id: '',
-      feed_asset_id: '',
-      production_details: '',
-    },
-    {
-      id: 'PR-003',
-      audience: 'Summer Sale (Slow)',
-      concept_id: '',
-      spec_id: 'META_FEED_1x1',
-      destinations: [{ name: 'Meta Feed' }, { name: 'LinkedIn' }, { name: 'Display' }],
-      notes: 'Static JPG; simple offer lockup.',
-      is_feed: false,
-      feed_template: '',
-      template_id: '',
-      feed_id: '',
-      feed_asset_id: '',
-      production_details: '',
-    },
-  ]);
+  const [productionMatrixRows, setProductionMatrixRows] = useState<ProductionMatrixLine[]>(
+    deriveProductionRowsFromMatrix(INITIAL_STRATEGY_MATRIX_RUNNING_SHOES),
+  );
   const [feedFields, setFeedFields] = useState<FeedFieldConfig[]>(BASE_FEED_FIELDS);
   const [visibleFeedFields, setVisibleFeedFields] = useState<FeedFieldKey[]>(
     BASE_FEED_FIELDS.map((f) => f.key).filter((key) => key !== 'date_start' && key !== 'date_end'),
@@ -816,7 +877,7 @@ export default function Home() {
       'Capture objectives, constraints, and how modular assets should recombine across channels.',
     content_matrix: [],
   }); 
-  const [matrixRows, setMatrixRows] = useState<MatrixRow[]>([]);
+  const [matrixRows, setMatrixRows] = useState<MatrixRow[]>(INITIAL_STRATEGY_MATRIX_RUNNING_SHOES);
   const [concepts, setConcepts] = useState<Concept[]>([
     {
       id: 'CON-001',
@@ -1889,6 +1950,107 @@ export default function Home() {
     setShowMatrixLibrary(true);
   }
 
+  const normalizeHeader = (h: string) =>
+    h
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+
+  function buildDefaultAudienceMapping(headers: string[]) {
+    const mapping: Record<string, string> = {};
+    const normalized = headers.map((h) => ({ raw: h, norm: normalizeHeader(h) }));
+    const guesses: Record<string, string[]> = {
+      segment_name: ['audience', 'segment', 'cohort', 'audience_segment'],
+      segment_id: ['segment_id', 'id'],
+      segment_size: ['size', 'segment_size', 'audience_size'],
+      priority_level: ['priority', 'tier'],
+      segment_description: ['description', 'segment_description'],
+      key_insight: ['insight', 'key_insight'],
+      current_perception: ['current', 'current_perception'],
+      desired_perception: ['desired', 'desired_perception'],
+      primary_message_pillar: ['pillar', 'message', 'primary_message_pillar'],
+      call_to_action_objective: ['cta', 'call_to_action', 'objective'],
+      tone_guardrails: ['tone', 'guardrails'],
+      platform_environments: ['platform', 'platforms', 'placements', 'channels', 'platform_environments'],
+      contextual_triggers: ['triggers', 'signals', 'context', 'contextual_triggers'],
+      notes: ['notes', 'comments'],
+    };
+    AUDIENCE_IMPORT_FIELDS.forEach((field) => {
+      const guessList = guesses[field.key] || [field.key];
+      const found = normalized.find((h) => guessList.includes(h.norm));
+      if (found) mapping[field.key] = found.raw;
+    });
+    return mapping;
+  }
+
+  function openAudienceFilePicker() {
+    audienceFileInputRef.current?.click();
+  }
+
+  function handleAudienceFileChange(e: any) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        if (!data) throw new Error('Unable to read file.');
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheet];
+        const rowsArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[];
+        const headers = (rowsArray[0] as string[])?.map((h) => (typeof h === 'string' ? h : String(h))) || [];
+        const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        setAudienceImportColumns(headers);
+        setAudienceImportRows(jsonRows as any[]);
+        setAudienceImportMapping(buildDefaultAudienceMapping(headers));
+        setAudienceImportOpen(true);
+      } catch (err) {
+        console.error('Error parsing audience file', err);
+        alert('Could not read file. Please upload a CSV or Excel with a header row.');
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function applyAudienceImport() {
+    if (!audienceImportRows.length) {
+      setAudienceImportOpen(false);
+      return;
+    }
+    const mappedRows: MatrixRow[] = [];
+    audienceImportRows.forEach((row: any) => {
+      const next: MatrixRow = {};
+      AUDIENCE_IMPORT_FIELDS.forEach((field) => {
+        const source = audienceImportMapping[field.key];
+        if (source && row[source] !== undefined && row[source] !== null) {
+          next[field.key] = String(row[source]);
+        }
+      });
+      if (Object.keys(next).length) {
+        mappedRows.push(next);
+      }
+    });
+    if (!mappedRows.length) {
+      alert('No rows were mapped. Please adjust the field mapping.');
+      return;
+    }
+    setMatrixRows((prev) => [...prev, ...mappedRows]);
+    setProductionMatrixRows((prev) => [
+      ...prev,
+      ...deriveProductionRowsFromMatrix(mappedRows).map((line, idx) => {
+        const nextId = `PR-${(prev.length + idx + 1).toString().padStart(3, '0')}`;
+        return { ...line, id: nextId };
+      }),
+    ]);
+    setAudienceImportOpen(false);
+    setAudienceImportRows([]);
+    setAudienceImportColumns([]);
+    setAudienceImportMapping({});
+  }
+
   function createSpec() {
     setCreateSpecError(null);
     const width = parseInt(newSpecWidth, 10);
@@ -2510,6 +2672,20 @@ export default function Home() {
                             >
                               Matrix Library
                             </button>
+                            <button
+                              type="button"
+                              onClick={openAudienceFilePicker}
+                              className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:text-teal-700 hover:border-teal-300 bg-white"
+                            >
+                              Import audiences (CSV/XLSX)
+                            </button>
+                            <input
+                              type="file"
+                              accept=".csv, .xlsx, .xls"
+                              ref={audienceFileInputRef}
+                              className="hidden"
+                              onChange={handleAudienceFileChange}
+                            />
                           </div>
                           <button
                             onClick={addMatrixRow}
@@ -4260,6 +4436,105 @@ export default function Home() {
 
       {/* Close main workspace row container */}
       </div>
+
+      {/* Audience import modal */}
+      {audienceImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Import Audience Matrix</h3>
+                <p className="text-[11px] text-slate-500">
+                  Map columns from your CSV/XLSX to the Strategy Matrix. Unmapped fields stay empty.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAudienceImportOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {AUDIENCE_IMPORT_FIELDS.map((field) => (
+                  <label key={field.key} className="space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-600">{field.label}</span>
+                    <select
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500 bg-white"
+                      value={audienceImportMapping[field.key] ?? ''}
+                      onChange={(e) =>
+                        setAudienceImportMapping((prev) => ({
+                          ...prev,
+                          [field.key]: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">-- Not mapped --</option>
+                      {audienceImportColumns.map((col) => (
+                        <option key={col} value={col}>
+                          {col}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+
+              {audienceImportRows.length > 0 && (
+                <div className="border border-slate-200 rounded-lg">
+                  <div className="px-3 py-2 border-b border-slate-100 text-[11px] text-slate-600 font-semibold">
+                    Preview (first 5 rows)
+                  </div>
+                  <div className="max-h-48 overflow-auto">
+                    <table className="min-w-full text-[11px]">
+                      <thead className="bg-slate-50 text-slate-600">
+                        <tr>
+                          {audienceImportColumns.map((col) => (
+                            <th key={col} className="px-2 py-1 text-left">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {audienceImportRows.slice(0, 5).map((row, idx) => (
+                          <tr key={idx} className="border-t border-slate-100">
+                            {audienceImportColumns.map((col) => (
+                              <td key={`${idx}-${col}`} className="px-2 py-1 text-slate-700">
+                                {String((row as any)[col] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAudienceImportOpen(false)}
+                className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyAudienceImport}
+                className="px-4 py-1.5 text-[11px] rounded-full border border-teal-500 text-white bg-teal-600 hover:bg-teal-700"
+              >
+                Import to matrix
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );
