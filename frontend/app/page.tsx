@@ -470,6 +470,36 @@ const DEMO_SPECS: Spec[] = [
   },
 ];
 
+// Local spec catalog – no API dependency.
+const PRESET_SPECS: Spec[] = [
+  // Meta
+  { id: 'META_REELS_9x16', platform: 'Meta', placement: 'Reels / Stories', width: 1080, height: 1920, orientation: 'Vertical', media_type: 'video', notes: '15-60s; avoid top/bottom UI zones.' },
+  { id: 'META_FEED_1x1', platform: 'Meta', placement: 'Feed', width: 1080, height: 1080, orientation: 'Square', media_type: 'image_or_video', notes: 'Center focal area; minimal text.' },
+  { id: 'META_FEED_4x5', platform: 'Meta', placement: 'Feed 4:5', width: 1080, height: 1350, orientation: 'Vertical', media_type: 'image_or_video', notes: 'Treat as tall card; keep CTA mid-frame.' },
+  { id: 'META_INSTREAM_16x9', platform: 'Meta', placement: 'In-Stream', width: 1920, height: 1080, orientation: 'Horizontal', media_type: 'video', notes: 'Sound-on; avoid lower-third overlays.' },
+  // TikTok
+  { id: 'TIKTOK_IN_FEED_9x16', platform: 'TikTok', placement: 'In-Feed', width: 1080, height: 1920, orientation: 'Vertical', media_type: 'video', notes: 'Hook in first 2s; keep text off right/bottom edges.' },
+  { id: 'TIKTOK_SPARK_9x16', platform: 'TikTok', placement: 'Spark Ads', width: 1080, height: 1920, orientation: 'Vertical', media_type: 'video', notes: 'Native post re-use; captions high.' },
+  // YouTube
+  { id: 'YOUTUBE_SHORTS_9x16', platform: 'YouTube', placement: 'Shorts', width: 1080, height: 1920, orientation: 'Vertical', media_type: 'video', notes: 'Vertical; central band safe.' },
+  { id: 'YOUTUBE_INSTREAM_16x9', platform: 'YouTube', placement: 'In-Stream', width: 1920, height: 1080, orientation: 'Horizontal', media_type: 'video', notes: 'Sound-on; TV-safe margins.' },
+  { id: 'YOUTUBE_BUMPER_16x9', platform: 'YouTube', placement: 'Bumper', width: 1920, height: 1080, orientation: 'Horizontal', media_type: 'video', notes: '6s cap; message by 2s.' },
+  // LinkedIn
+  { id: 'LINKEDIN_IMAGE_1x1', platform: 'LinkedIn', placement: 'Sponsored Image', width: 1200, height: 1200, orientation: 'Square', media_type: 'image', notes: 'B2B clarity; sparse text.' },
+  { id: 'LINKEDIN_VIDEO_1x1', platform: 'LinkedIn', placement: 'Sponsored Video 1:1', width: 1080, height: 1080, orientation: 'Square', media_type: 'video', notes: 'Subtitles above lower quarter.' },
+  { id: 'LINKEDIN_VIDEO_16x9', platform: 'LinkedIn', placement: 'Sponsored Video 16:9', width: 1920, height: 1080, orientation: 'Horizontal', media_type: 'video', notes: 'Assume sound-off; clear supers.' },
+  // X / Twitter
+  { id: 'X_IMAGE_16x9', platform: 'X', placement: 'Promoted Image 16:9', width: 1600, height: 900, orientation: 'Horizontal', media_type: 'image', notes: 'Avoid corner copy; tweet text carries message.' },
+  { id: 'X_IMAGE_1x1', platform: 'X', placement: 'Promoted Image 1:1', width: 1200, height: 1200, orientation: 'Square', media_type: 'image', notes: 'Square preview; avoid tiny legal.' },
+  { id: 'X_VIDEO_9x16', platform: 'X', placement: 'Vertical Video', width: 1080, height: 1920, orientation: 'Vertical', media_type: 'video', notes: 'Subtitles above progress bar.' },
+  // Google Display / Open Web (IAB)
+  { id: 'GDN_MPU_300x250', platform: 'Open Web', placement: 'MPU', width: 300, height: 250, orientation: 'Rectangle', media_type: 'image_or_html5', notes: 'Max 150kb; logo + short CTA.' },
+  { id: 'GDN_LEADERBOARD_728x90', platform: 'Open Web', placement: 'Leaderboard', width: 728, height: 90, orientation: 'Horizontal', media_type: 'image_or_html5', notes: 'Tight height; prioritize logo + CTA.' },
+  { id: 'GDN_HALF_PAGE_300x600', platform: 'Open Web', placement: 'Half Page', width: 300, height: 600, orientation: 'Vertical', media_type: 'image_or_html5', notes: 'Tall canvas; hook in top half.' },
+  { id: 'GDN_BILLBOARD_970x250', platform: 'Open Web', placement: 'Billboard', width: 970, height: 250, orientation: 'Horizontal', media_type: 'image_or_html5', notes: 'Hero-friendly; maintain safe margins.' },
+  { id: 'GDN_MOBILE_LEADERBOARD_320x50', platform: 'Open Web', placement: 'Mobile Leaderboard', width: 320, height: 50, orientation: 'Horizontal', media_type: 'image_or_html5', notes: 'Extremely short; logo + 1-2 words.' },
+];
+
 const HISTORICAL_BRIEFS: HistoricalBrief[] = [
   {
     id: "HB-001",
@@ -628,7 +658,7 @@ export default function Home() {
     flight_dates: {},
     status: 'Draft',
   });
-  const [specs, setSpecs] = useState<Spec[]>([]);
+  const [specs, setSpecs] = useState<Spec[]>(PRESET_SPECS);
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [specsError, setSpecsError] = useState<string | null>(null);
   const [productionBatch, setProductionBatch] = useState<ProductionBatch | null>(null);
@@ -1634,7 +1664,7 @@ export default function Home() {
     setShowMatrixLibrary(true);
   }
 
-  async function createSpec() {
+  function createSpec() {
     setCreateSpecError(null);
     const width = parseInt(newSpecWidth, 10);
     const height = parseInt(newSpecHeight, 10);
@@ -1644,96 +1674,48 @@ export default function Home() {
       return;
     }
 
-    setCreatingSpec(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/specs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform: newSpecPlatform.trim(),
-          placement: newSpecPlacement.trim(),
-          width,
-          height,
-          orientation: newSpecOrientation.trim(),
-          media_type: newSpecMediaType.trim() || 'image_or_video',
-          notes: newSpecNotes.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to create spec: ${res.status}`);
-      }
-      // Refresh list
-      await loadSpecs();
-      // Reset form
-      setNewSpecPlatform('');
-      setNewSpecPlacement('');
-      setNewSpecWidth('');
-      setNewSpecHeight('');
-      setNewSpecOrientation('');
-      setNewSpecMediaType('');
-      setNewSpecNotes('');
-    } catch (e: any) {
-      setCreateSpecError(e?.message ?? 'Unable to create spec.');
-    } finally {
-      setCreatingSpec(false);
+    const cleanPlatform = newSpecPlatform.trim();
+    const cleanPlacement = newSpecPlacement.trim();
+    const orientation = newSpecOrientation.trim() || 'Unspecified';
+    const mediaType = newSpecMediaType.trim() || 'image_or_video';
+    const notes = newSpecNotes.trim() || '';
+    const baseId = `${cleanPlatform}_${cleanPlacement}_${width}x${height}`
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_');
+    const existingIds = new Set(specs.map((s) => s.id));
+    let candidate = baseId;
+    let i = 1;
+    while (existingIds.has(candidate)) {
+      candidate = `${baseId}_${i}`;
+      i += 1;
     }
-  }
 
-  async function loadSpecs() {
-    setLoadingSpecs(true);
-    setSpecsError(null);
-    try {
-      // Try primary base URL first; fall back to same-origin if base is missing/unreachable
-      const candidates = [
-        `${API_BASE_URL}/specs`.replace(/\/{2,}/g, '/').replace('http:/', 'http://').replace('https:/', 'https://'),
-        '/specs',
-      ];
+    const newSpec: Spec = {
+      id: candidate,
+      platform: cleanPlatform,
+      placement: cleanPlacement,
+      width,
+      height,
+      orientation,
+      media_type: mediaType,
+      notes,
+    };
 
-      let fetched: Spec[] | null = null;
-      let lastError: any = null;
-
-      for (const url of candidates) {
-        try {
-          const res = await fetch(url);
-          if (!res.ok) {
-            lastError = new Error(`Failed to load specs: ${res.status}`);
-            continue;
-          }
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            fetched = data;
-            break;
-          }
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      if (fetched && fetched.length) {
-        setSpecs(fetched);
-      } else {
-        setSpecs([]);
-        if (lastError) {
-          throw lastError;
-        } else {
-          throw new Error('No specs returned from API.');
-        }
-      }
-    } catch (e: any) {
-      setSpecsError(e?.message ?? 'Unable to load specs.');
-      // Keep the UI usable in demo/offline scenarios with a sensible fallback
-      setSpecs((prev) => (prev.length ? prev : DEMO_SPECS));
-    } finally {
-      setLoadingSpecs(false);
-    }
+    setSpecs((prev) => [...prev, newSpec]);
+    setNewSpecPlatform('');
+    setNewSpecPlacement('');
+    setNewSpecWidth('');
+    setNewSpecHeight('');
+    setNewSpecOrientation('');
+    setNewSpecMediaType('');
+    setNewSpecNotes('');
   }
 
   useEffect(() => {
-    if (workspaceView === 'production' && specs.length === 0 && !loadingSpecs) {
-      loadSpecs();
+    if (workspaceView === 'production' && specs.length === 0) {
+      setSpecs(PRESET_SPECS);
     }
-  }, [workspaceView, specs.length, loadingSpecs]);
+  }, [workspaceView, specs.length]);
 
   const specsByPlatform: { [platform: string]: Spec[] } = {};
   for (const spec of specs) {
@@ -2828,11 +2810,10 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => loadSpecs()}
-                        disabled={loadingSpecs}
-                        className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+                        onClick={() => setSpecs(PRESET_SPECS)}
+                        className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
                       >
-                        {loadingSpecs ? 'Refreshing…' : 'Refresh'}
+                        Reset to defaults
                       </button>
                       <button
                         type="button"
@@ -2847,7 +2828,7 @@ export default function Home() {
                   {loadingSpecs && <p className="text-[11px] text-slate-400">Loading specs…</p>}
                   {specsError && (
                     <p className="text-[11px] text-red-500">
-                      {specsError} {specs.length ? '(showing cached/fallback list)' : ''}
+                      {specsError} {specs.length ? '(showing fallback list)' : ''}
                     </p>
                   )}
 

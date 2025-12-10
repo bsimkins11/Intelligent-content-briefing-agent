@@ -45,6 +45,17 @@
           "safe_zones": {
             "instruction": "Treat as tall feed card; keep core focal area centered vertically."
           }
+        },
+        {
+          "id": "in_stream_16x9",
+          "name": "In-Stream 16:9",
+          "ratio": "16:9",
+          "resolution_recommended": "1920x1080",
+          "media_type": "video",
+          "max_duration_seconds": 120,
+          "safe_zones": {
+            "instruction": "Assume sound-on; avoid lower-third overlays clashing with progress bar."
+          }
         }
       ]
     },
@@ -61,6 +72,17 @@
           "max_duration_seconds": 60,
           "safe_zones": {
             "instruction": "Keep text away from right edge and bottom 300px where UI and captions sit."
+          }
+        },
+        {
+          "id": "spark_ads_9x16",
+          "name": "Spark Ads 9:16",
+          "ratio": "9:16",
+          "resolution_recommended": "1080x1920",
+          "media_type": "video",
+          "max_duration_seconds": 60,
+          "safe_zones": {
+            "instruction": "Treat like native posts; keep hooks in first second and subtitles high."
           }
         }
       ]
@@ -87,6 +109,17 @@
           "media_type": "video",
           "safe_zones": {
             "instruction": "TV-safe; allow for overscan on connected TVs, avoid tiny typography."
+          }
+        },
+        {
+          "id": "bumper_16x9",
+          "name": "Bumper 16:9",
+          "ratio": "16:9",
+          "resolution_recommended": "1920x1080",
+          "media_type": "video",
+          "max_duration_seconds": 6,
+          "safe_zones": {
+            "instruction": "Land message in first 2s; keep supers clear of lower-third progress bar."
           }
         }
       ]
@@ -124,6 +157,36 @@
           "safe_zones": {
             "instruction": "Stack content top‑to‑bottom; avoid dense copy near the bottom edge."
           }
+        },
+        {
+          "id": "half_page_300x600",
+          "name": "Half Page 300x600",
+          "ratio": "1:2",
+          "resolution_recommended": "300x600",
+          "media_type": "image_or_html5",
+          "safe_zones": {
+            "instruction": "Treat as tall canvas; keep primary hook in top half."
+          }
+        },
+        {
+          "id": "billboard_970x250",
+          "name": "Billboard 970x250",
+          "ratio": "3.9:1",
+          "resolution_recommended": "970x250",
+          "media_type": "image_or_html5",
+          "safe_zones": {
+            "instruction": "Great for hero imagery; maintain safe margins for responsive resizing."
+          }
+        },
+        {
+          "id": "mobile_leaderboard_320x50",
+          "name": "Mobile Leaderboard 320x50",
+          "ratio": "32:5",
+          "resolution_recommended": "320x50",
+          "media_type": "image_or_html5",
+          "safe_zones": {
+            "instruction": "Extremely tight vertical space; focus on logo + 1-2 word CTA."
+          }
         }
       ]
     },
@@ -150,6 +213,16 @@
           "safe_zones": {
             "instruction": "Assume sound‑off; ensure captions and key messaging are legible."
           }
+        },
+        {
+          "id": "video_1x1",
+          "name": "Sponsored Video – 1:1",
+          "ratio": "1:1",
+          "resolution_recommended": "1080x1080",
+          "media_type": "video",
+          "safe_zones": {
+            "instruction": "Square video; keep subtitles away from lower quarter."
+          }
         }
       ]
     },
@@ -175,6 +248,16 @@
           "media_type": "video",
           "safe_zones": {
             "instruction": "Hook in first second; keep subtitles above progress bar."
+          }
+        },
+        {
+          "id": "square_image_1x1",
+          "name": "Promoted Image 1:1",
+          "ratio": "1:1",
+          "resolution_recommended": "1200x1200",
+          "media_type": "image",
+          "safe_zones": {
+            "instruction": "Square preview in-feed; avoid tiny legal and edge-hugging CTAs."
           }
         }
       ]
@@ -229,5 +312,4 @@
     }
   }
 }
-
 
