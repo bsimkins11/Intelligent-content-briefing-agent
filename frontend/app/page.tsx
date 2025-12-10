@@ -736,6 +736,8 @@ export default function Home() {
   const [productionTab, setProductionTab] = useState<'requirements' | 'specLibrary'>('requirements');
   const [pendingDestAudience, setPendingDestAudience] = useState<{ [rowId: string]: string }>({});
   const [showPlan, setShowPlan] = useState(false);
+  const [showJobs, setShowJobs] = useState(true);
+  const [showBoard, setShowBoard] = useState(true);
   const [productionMatrixRows, setProductionMatrixRows] = useState<ProductionMatrixLine[]>([
     {
       id: 'PR-001',
@@ -2925,7 +2927,7 @@ export default function Home() {
                   )}
 
                   {/* Production Requirements List – concept-to-spec grouper */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -2939,8 +2941,16 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => setShowJobs((prev) => !prev)}
+                          className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                        >
+                          {showJobs ? 'Hide section' : 'Show section'}
+                        </button>
+                        <button
+                          type="button"
                           onClick={generateProductionJobsFromBuilder}
                           disabled={
+                            !showJobs ||
                             builderLoading ||
                             (!builderSelectedConceptId && productionMatrixRows.length === 0) ||
                             (builderSelectedSpecIds.length === 0 && productionMatrixRows.length === 0)
@@ -2952,165 +2962,170 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => generateProductionJobsFromBuilder()}
-                          className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                          disabled={!showJobs}
+                          className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
                         >
                           Send matrix rows →
                         </button>
                       </div>
                     </div>
-                    {builderError && (
-                      <p className="text-[11px] text-red-500">{builderError}</p>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                          Creative Concept
-                        </label>
-                        <select
-                          value={builderSelectedConceptId}
-                          onChange={(e) => {
-                            setBuilderSelectedConceptId(e.target.value);
-                          }}
-                          className="w-full text-sm border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                        >
-                          <option value="">Select a concept…</option>
-                          {concepts.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.title}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[11px] text-slate-500">
-                          Concepts come from the Concept Canvas above. Choose one to act as the
-                          master idea for this asset group.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                          Selected Specs
-                        </label>
-                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between">
-                            <span className="text-sm text-slate-600">
-                                {builderSelectedSpecIds.length} specs selected
-                            </span>
-                            <button
-                                onClick={() => setProductionTab('specLibrary')}
-                                className="text-xs text-teal-600 font-medium hover:text-teal-700 hover:underline"
+                    {showJobs && (
+                      <>
+                        {builderError && (
+                          <p className="text-[11px] text-red-500">{builderError}</p>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Creative Concept
+                            </label>
+                            <select
+                              value={builderSelectedConceptId}
+                              onChange={(e) => {
+                                setBuilderSelectedConceptId(e.target.value);
+                              }}
+                              className="w-full text-sm border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                             >
-                                Manage in Library →
-                            </button>
+                              <option value="">Select a concept…</option>
+                              {concepts.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.title}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-[11px] text-slate-500">
+                              Concepts come from the Concept Canvas above. Choose one to act as the
+                              master idea for this asset group.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Selected Specs
+                            </label>
+                            <div className="p-3 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between">
+                                <span className="text-sm text-slate-600">
+                                    {builderSelectedSpecIds.length} specs selected
+                                </span>
+                                <button
+                                    onClick={() => setProductionTab('specLibrary')}
+                                    className="text-xs text-teal-600 font-medium hover:text-teal-700 hover:underline"
+                                >
+                                    Manage in Library →
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Select the target formats for this production run in the Spec Library.
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-500">
-                          Select the target formats for this production run in the Spec Library.
-                        </p>
-                      </div>
-                    </div>
 
-                    {builderJobs.length > 0 && (
-                      <div className="pt-3 border-t border-slate-200 space-y-2">
-                        <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                          Consolidated Production Jobs
-                        </h4>
-                        <p className="text-[11px] text-slate-500 max-w-2xl">
-                          Each row is one master asset to be produced, with multiple downstream
-                          delivery destinations grouped by shared physical specs. Add requirements
-                          and a simple status so producers can see what needs to be built and where
-                          it stands.
-                        </p>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-[11px]">
-                            <thead>
-                              <tr className="text-left text-slate-500 border-b border-slate-200">
-                                <th className="py-1.5 pr-4 font-semibold">Production Asset</th>
-                                <th className="py-1.5 pr-4 font-semibold">Tech Specs</th>
-                                <th className="py-1.5 pr-4 font-semibold">Destinations</th>
-                                <th className="py-1.5 pr-4 font-semibold">Meta</th>
-                                <th className="py-1.5 pr-4 font-semibold">Requirements</th>
-                                <th className="py-1.5 pr-4 font-semibold">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {builderJobs.map((job) => {
-                                const uniqueNotes = Array.from(
-                                  new Set(job.destinations.map((d) => d.special_notes).filter(Boolean)),
-                                );
-                                const effectiveStatus = jobStatuses[job.job_id] ?? job.status;
-                                const requirementsValue = jobRequirements[job.job_id] ?? '';
-                                return (
-                                  <tr key={job.job_id} className="border-b border-slate-100 align-top">
-                                    <td className="py-1.5 pr-4">
-                                      <div className="font-semibold text-slate-800">
-                                        {job.asset_type} – {job.creative_concept}
-                                      </div>
-                                      <div className="text-[10px] text-slate-400">{job.job_id}</div>
-                                    </td>
-                                    <td className="py-1.5 pr-4 text-slate-700">
-                                      {job.technical_summary}
-                                    </td>
-                                    <td className="py-1.5 pr-4">
-                                      <div className="flex flex-wrap gap-1">
-                                        {job.destinations.map((dest) => (
-                                          <span
-                                            key={`${job.job_id}-${dest.spec_id}-${dest.platform_name}-${dest.special_notes || ''}`}
-                                            className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]"
-                                          >
-                                            {dest.platform_name}{' '}
-                                            <span className="text-slate-400">
-                                              · {dest.format_name}
-                                            </span>
-                                            {dest.special_notes && (
-                                              <span className="ml-1 text-amber-700 bg-amber-50 px-1 rounded">
-                                                {dest.special_notes}
-                                              </span>
-                                            )}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </td>
-                                    <td className="py-1.5 pr-4 text-slate-500 text-[10px]">
-                                      {job.technical_summary}
-                                    </td>
-                                    <td className="py-1.5 pr-4 text-slate-700">
-                                      <textarea
-                                        className="w-full min-w-[220px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
-                                        rows={3}
-                                        placeholder={
-                                          uniqueNotes.length
-                                            ? `Key cautions: ${uniqueNotes.join(' | ')}`
-                                            : 'Capture source asset requirements, editing notes, or handoff details.'
-                                        }
-                                        value={requirementsValue}
-                                        onChange={(e) =>
-                                          setJobRequirements((prev) => ({
-                                            ...prev,
-                                            [job.job_id]: e.target.value,
-                                          }))
-                                        }
-                                      />
-                                    </td>
-                                    <td className="py-1.5 pr-4 text-slate-700">
-                                      <select
-                                        className="text-[11px] border border-slate-300 rounded-full px-2 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                        value={effectiveStatus}
-                                        onChange={(e) =>
-                                          setJobStatuses((prev) => ({
-                                            ...prev,
-                                            [job.job_id]: e.target.value,
-                                          }))
-                                        }
-                                      >
-                                        <option value="Pending">Pending</option>
-                                        <option value="In-Production">In Production</option>
-                                        <option value="Approved">Approved</option>
-                                      </select>
-                                    </td>
+                        {builderJobs.length > 0 && (
+                          <div className="pt-3 border-t border-slate-200 space-y-2">
+                            <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Consolidated Production Jobs
+                            </h4>
+                            <p className="text-[11px] text-slate-500 max-w-2xl">
+                              Each row is one master asset to be produced, with multiple downstream
+                              delivery destinations grouped by shared physical specs. Add requirements
+                              and a simple status so producers can see what needs to be built and where
+                              it stands.
+                            </p>
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-[11px]">
+                                <thead>
+                                  <tr className="text-left text-slate-500 border-b border-slate-200">
+                                    <th className="py-1.5 pr-4 font-semibold">Production Asset</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Tech Specs</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Destinations</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Meta</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Requirements</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Status</th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                                </thead>
+                                <tbody>
+                                  {builderJobs.map((job) => {
+                                    const uniqueNotes = Array.from(
+                                      new Set(job.destinations.map((d) => d.special_notes).filter(Boolean)),
+                                    );
+                                    const effectiveStatus = jobStatuses[job.job_id] ?? job.status;
+                                    const requirementsValue = jobRequirements[job.job_id] ?? '';
+                                    return (
+                                      <tr key={job.job_id} className="border-b border-slate-100 align-top">
+                                        <td className="py-1.5 pr-4">
+                                          <div className="font-semibold text-slate-800">
+                                            {job.asset_type} – {job.creative_concept}
+                                          </div>
+                                          <div className="text-[10px] text-slate-400">{job.job_id}</div>
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-slate-700">
+                                          {job.technical_summary}
+                                        </td>
+                                        <td className="py-1.5 pr-4">
+                                          <div className="flex flex-wrap gap-1">
+                                            {job.destinations.map((dest) => (
+                                              <span
+                                                key={`${job.job_id}-${dest.spec_id}-${dest.platform_name}-${dest.special_notes || ''}`}
+                                                className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]"
+                                              >
+                                                {dest.platform_name}{' '}
+                                                <span className="text-slate-400">
+                                                  · {dest.format_name}
+                                                </span>
+                                                {dest.special_notes && (
+                                                  <span className="ml-1 text-amber-700 bg-amber-50 px-1 rounded">
+                                                    {dest.special_notes}
+                                                  </span>
+                                                )}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-slate-500 text-[10px]">
+                                          {job.technical_summary}
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-slate-700">
+                                          <textarea
+                                            className="w-full min-w-[220px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                                            rows={3}
+                                            placeholder={
+                                              uniqueNotes.length
+                                                ? `Key cautions: ${uniqueNotes.join(' | ')}`
+                                                : 'Capture source asset requirements, editing notes, or handoff details.'
+                                            }
+                                            value={requirementsValue}
+                                            onChange={(e) =>
+                                              setJobRequirements((prev) => ({
+                                                ...prev,
+                                                [job.job_id]: e.target.value,
+                                              }))
+                                            }
+                                          />
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-slate-700">
+                                          <select
+                                            className="text-[11px] border border-slate-300 rounded-full px-2 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                            value={effectiveStatus}
+                                            onChange={(e) =>
+                                              setJobStatuses((prev) => ({
+                                                ...prev,
+                                                [job.job_id]: e.target.value,
+                                              }))
+                                            }
+                                          >
+                                            <option value="Pending">Pending</option>
+                                            <option value="In-Production">In Production</option>
+                                            <option value="Approved">Approved</option>
+                                          </select>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -3125,77 +3140,90 @@ export default function Home() {
                           Kanban view of the production jobs. Each card is a single asset to be built with full spec details.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={generateProductionPlan}
-                        disabled={productionLoading}
-                        className="px-4 py-2 text-xs font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
-                      >
-                        {productionLoading
-                          ? 'Generating…'
-                          : productionBatch
-                          ? 'Regenerate Plan'
-                          : 'Generate Plan'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowBoard((prev) => !prev)}
+                          className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                        >
+                          {showBoard ? 'Hide board' : 'Show board'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={generateProductionPlan}
+                          disabled={productionLoading}
+                          className="px-4 py-2 text-xs font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
+                        >
+                          {productionLoading
+                            ? 'Generating…'
+                            : productionBatch
+                            ? 'Regenerate Plan'
+                            : 'Generate Plan'}
+                        </button>
+                      </div>
                     </div>
-                    {productionError && (
-                      <p className="text-[11px] text-red-500">{productionError}</p>
-                    )}
-                    {!productionBatch || productionAssets.length === 0 ? (
-                      <div className="mt-12 flex flex-col items-center justify-center text-center text-slate-400 gap-3">
-                        <p className="text-sm max-w-xs">
-                          Start by generating a production plan from the first Strategy card and Concept.
-                          You can then move assets through Todo → In Progress → In Review → Approved.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {['Todo', 'In_Progress', 'Review', 'Approved'].map((col) => (
-                          <div
-                            key={col}
-                            className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-2"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                                {col === 'In_Progress'
-                                  ? 'In Progress'
-                                  : col === 'Review'
-                                  ? 'In Review'
-                                  : col}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {productionAssets.filter((a) => a.status === col).length}
-                              </span>
-                            </div>
-                            <div className="space-y-2">
-                              {productionAssets
-                                .filter((a) => a.status === col)
-                                .map((asset) => (
-                                  <button
-                                    key={asset.id}
-                                    type="button"
-                                    onClick={() => setSelectedAsset(asset)}
-                                    className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-semibold text-slate-800 truncate">
-                                          {asset.asset_name}
-                                        </p>
-                                        <p className="text-[10px] text-slate-500 truncate">
-                                          {asset.platform} · {asset.placement}
-                                        </p>
-                                      </div>
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
-                                        {asset.asset_type}
-                                      </span>
-                                    </div>
-                                  </button>
-                                ))}
-                            </div>
+                    {showBoard && (
+                      <>
+                        {productionError && (
+                          <p className="text-[11px] text-red-500">{productionError}</p>
+                        )}
+                        {!productionBatch || productionAssets.length === 0 ? (
+                          <div className="mt-12 flex flex-col items-center justify-center text-center text-slate-400 gap-3">
+                            <p className="text-sm max-w-xs">
+                              Start by generating a production plan from the first Strategy card and Concept.
+                              You can then move assets through Todo → In Progress → In Review → Approved.
+                            </p>
                           </div>
-                        ))}
-                      </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {['Todo', 'In_Progress', 'Review', 'Approved'].map((col) => (
+                              <div
+                                key={col}
+                                className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-2"
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                                    {col === 'In_Progress'
+                                      ? 'In Progress'
+                                      : col === 'Review'
+                                      ? 'In Review'
+                                      : col}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {productionAssets.filter((a) => a.status === col).length}
+                                  </span>
+                                </div>
+                                <div className="space-y-2">
+                                  {productionAssets
+                                    .filter((a) => a.status === col)
+                                    .map((asset) => (
+                                      <button
+                                        key={asset.id}
+                                        type="button"
+                                        onClick={() => setSelectedAsset(asset)}
+                                        className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="min-w-0">
+                                            <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                              {asset.asset_name}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 truncate">
+                                              {asset.platform} · {asset.placement}
+                                            </p>
+                                          </div>
+                                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
+                                            {asset.asset_type}
+                                          </span>
+                                        </div>
+                                      </button>
+                                    ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {selectedAsset && (
