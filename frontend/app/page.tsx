@@ -156,6 +156,11 @@ type DeliveryDestinationRow = {
   special_notes: string;
 };
 
+type DestinationEntry = {
+  name: string;
+  audience?: string;
+};
+
 type ProductionJobRow = {
   job_id: string;
   creative_concept: string;
@@ -170,7 +175,7 @@ type ProductionMatrixLine = {
   audience: string;
   concept_id: string;
   spec_id: string;
-  destinations: string; // comma-separated partners/placements
+  destinations: DestinationEntry[];
   notes: string;
   is_feed: boolean;
   feed_template: string;
@@ -534,6 +539,17 @@ const PRESET_SPECS: Spec[] = [
   { id: 'MOB_TABLET_LANDSCAPE_1024x768', platform: 'Mobile', placement: 'Tablet Landscape', width: 1024, height: 768, orientation: 'Horizontal', media_type: 'image_or_html5', notes: 'Tablet landscape; keep focal area centered.' },
 ];
 
+const DESTINATION_OPTIONS_BY_PLATFORM: Record<string, string[]> = {
+  Meta: ['Meta Reels/Stories', 'Meta Feed', 'Meta In-Stream'],
+  TikTok: ['TikTok In-Feed'],
+  YouTube: ['YouTube Shorts', 'YouTube In-Stream', 'YouTube Bumper'],
+  LinkedIn: ['LinkedIn Feed', 'LinkedIn Video'],
+  X: ['X Feed', 'X Video'],
+  'Open Web': ['Open Web Display', 'GDN'],
+  CTV: ['CTV Fullscreen', 'CTV Overlay'],
+  Mobile: ['In-App Banner', 'In-App Interstitial'],
+};
+
 const HISTORICAL_BRIEFS: HistoricalBrief[] = [
   {
     id: "HB-001",
@@ -718,13 +734,19 @@ export default function Home() {
   const [createSpecError, setCreateSpecError] = useState<string | null>(null);
   const [showSpecCreator, setShowSpecCreator] = useState(false);
   const [productionTab, setProductionTab] = useState<'requirements' | 'specLibrary'>('requirements');
+  const [pendingDestAudience, setPendingDestAudience] = useState<{ [rowId: string]: string }>({});
   const [productionMatrixRows, setProductionMatrixRows] = useState<ProductionMatrixLine[]>([
     {
       id: 'PR-001',
       audience: 'Summer Sale (Fast)',
       concept_id: '',
       spec_id: 'TIKTOK_IN_FEED_9x16',
-      destinations: 'TikTok, Instagram, Shorts, Snap',
+      destinations: [
+        { name: 'TikTok' },
+        { name: 'Instagram' },
+        { name: 'Shorts' },
+        { name: 'Snap' },
+      ],
       notes: '15s vertical; keep supers high.',
       is_feed: false,
       feed_template: '',
@@ -738,7 +760,7 @@ export default function Home() {
       audience: 'Summer Sale (Fast)',
       concept_id: '',
       spec_id: 'YOUTUBE_INSTREAM_16x9',
-      destinations: 'YouTube, CTV, X',
+      destinations: [{ name: 'YouTube' }, { name: 'CTV' }, { name: 'X' }],
       notes: '16:9 instream cut; loud/clear open.',
       is_feed: false,
       feed_template: '',
@@ -752,7 +774,7 @@ export default function Home() {
       audience: 'Summer Sale (Slow)',
       concept_id: '',
       spec_id: 'META_FEED_1x1',
-      destinations: 'Meta Feed, LinkedIn, Display',
+      destinations: [{ name: 'Meta Feed' }, { name: 'LinkedIn' }, { name: 'Display' }],
       notes: 'Static JPG; simple offer lockup.',
       is_feed: false,
       feed_template: '',
@@ -1590,7 +1612,7 @@ export default function Home() {
         audience: '',
         concept_id: defaultConceptId,
         spec_id: '',
-        destinations: '',
+        destinations: [],
         notes: '',
         is_feed: false,
         feed_template: '',
@@ -1605,10 +1627,39 @@ export default function Home() {
   const updateProductionMatrixCell = (
     index: number,
     field: keyof ProductionMatrixLine,
-    value: string | boolean,
+    value: string | boolean | DestinationEntry[],
   ) => {
     setProductionMatrixRows((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const getDestinationOptionsForSpec = (specId: string): string[] => {
+    const spec = specs.find((s) => s.id === specId);
+    if (!spec) return [];
+    return DESTINATION_OPTIONS_BY_PLATFORM[spec.platform] || [spec.platform];
+  };
+
+  const addDestinationToRow = (index: number, destination: string) => {
+    if (!destination) return;
+    setProductionMatrixRows((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const existing = (row.destinations || []).map((d) => d.name);
+        if (existing.includes(destination)) return row;
+        const next = [...(row.destinations || []), { name: destination }];
+        return { ...row, destinations: next };
+      }),
+    );
+  };
+
+  const removeDestinationFromRow = (index: number, destination: string) => {
+    setProductionMatrixRows((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        const next = (row.destinations || []).filter((d) => d.name !== destination);
+        return { ...row, destinations: next };
+      }),
     );
   };
 
@@ -1641,16 +1692,12 @@ export default function Home() {
         if (row.feed_asset_id) metaSuffixParts.push(`asset:${row.feed_asset_id}`);
         if (row.production_details && !row.is_feed) metaSuffixParts.push(`build:${row.production_details}`);
         const metaSuffix = metaSuffixParts.length ? ` [${metaSuffixParts.join(' | ')}]` : '';
-        const destinations = row.destinations
-          .split(',')
-          .map((d) => d.trim())
-          .filter(Boolean)
-          .map((d) => ({
-            platform_name: d,
-            spec_id: spec?.id || row.spec_id || `SPEC-${idx + 1}`,
-            format_name: spec?.placement || spec?.media_type || '',
-            special_notes: row.notes,
-          }));
+        const destinations = (row.destinations || []).map((dest) => ({
+          platform_name: dest.name,
+          spec_id: spec?.id || row.spec_id || `SPEC-${idx + 1}`,
+          format_name: spec?.placement || spec?.media_type || '',
+          special_notes: dest.audience ? `Audience: ${dest.audience}` : row.notes,
+        }));
         jobs.push({
           job_id: row.id || `JOB-${idx + 1}`,
           creative_concept: conceptLabel,
@@ -2594,7 +2641,7 @@ export default function Home() {
                             <th className="px-3 py-2 text-left">Audience</th>
                             <th className="px-3 py-2 text-left">Concept</th>
                             <th className="px-3 py-2 text-left">Spec</th>
-                            <th className="px-3 py-2 text-left">Destinations (auto from spec)</th>
+                            <th className="px-3 py-2 text-left">Destinations (by spec)</th>
                             <th className="px-3 py-2 text-left">Feed?</th>
                             <th className="px-3 py-2 text-left">Feed Template</th>
                             <th className="px-3 py-2 text-left">Template ID</th>
@@ -2641,8 +2688,10 @@ export default function Home() {
                                       updateProductionMatrixCell(index, 'spec_id', nextSpecId);
                                       const selectedSpec = specs.find((s) => s.id === nextSpecId);
                                       if (selectedSpec) {
-                                        const destLabel = `${selectedSpec.platform} · ${selectedSpec.placement}`;
-                                        updateProductionMatrixCell(index, 'destinations', destLabel);
+                                        const destEntry: DestinationEntry = {
+                                          name: `${selectedSpec.platform} · ${selectedSpec.placement}`,
+                                        };
+                                        updateProductionMatrixCell(index, 'destinations', [destEntry]);
                                       }
                                     }}
                                   >
@@ -2654,16 +2703,107 @@ export default function Home() {
                                     ))}
                                   </select>
                                 </td>
-                                <td className="px-3 py-2 align-top">
-                                  <input
-                                    className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                    value={row.destinations}
-                                    onChange={(e) => updateProductionMatrixCell(index, 'destinations', e.target.value)}
-                                    placeholder="Select a spec to set partner/placement"
-                                    disabled={Boolean(row.spec_id)}
-                                  />
-                                  <p className="text-[10px] text-slate-400 mt-1">
-                                    Destinations mirror the chosen spec’s platform/placement.
+                                <td className="px-3 py-2 align-top space-y-2">
+                                  <div className="flex flex-wrap gap-1">
+                                    {(row.destinations || []).map((dest) => (
+                                      <span
+                                        key={`${dest.name}-${dest.audience || 'any'}`}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]"
+                                      >
+                                        {dest.name}
+                                        {dest.audience && (
+                                          <span className="text-amber-700 bg-amber-50 px-1 rounded">
+                                            {dest.audience}
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => removeDestinationFromRow(index, dest.name)}
+                                          className="text-slate-400 hover:text-red-500"
+                                        >
+                                          ×
+                                        </button>
+                                      </span>
+                                    ))}
+                                    {!row.destinations || row.destinations.length === 0 ? (
+                                      <span className="text-[10px] text-slate-400">None yet</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      className="flex-1 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                      value=""
+                                      onChange={(e) => {
+                                        addDestinationToRow(index, e.target.value);
+                                      }}
+                                      disabled={!row.spec_id}
+                                    >
+                                      <option value="">
+                                        {row.spec_id ? 'Add destination' : 'Select a spec first'}
+                                      </option>
+                                      {getDestinationOptionsForSpec(row.spec_id).map((opt) => (
+                                        <option key={opt} value={opt}>
+                                          {opt}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      className="flex-1 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                      placeholder="Custom destination"
+                                      disabled={!row.spec_id}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          const val = (e.target as HTMLInputElement).value.trim();
+                                          addDestinationToRow(index, val);
+                                          (e.target as HTMLInputElement).value = '';
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  {row.destinations && row.destinations.length > 0 && (
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        className="flex-1 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                        value={pendingDestAudience[row.id] ?? ''}
+                                        onChange={(e) =>
+                                          setPendingDestAudience((prev) => ({ ...prev, [row.id]: e.target.value }))
+                                        }
+                                      >
+                                        <option value="">Audience tag (optional)</option>
+                                        <option value="Prospecting">Prospecting</option>
+                                        <option value="Retargeting">Retargeting</option>
+                                        <option value="Loyalty">Loyalty</option>
+                                        <option value="B2B">B2B</option>
+                                        <option value="B2C">B2C</option>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        className="px-2 py-1 text-[10px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                                        onClick={() => {
+                                          const audienceTag = (pendingDestAudience[row.id] || '').trim();
+                                          if (!audienceTag) return;
+                                          // Apply to the last added destination
+                                          setProductionMatrixRows((prev) =>
+                                            prev.map((r) => {
+                                              if (r.id !== row.id) return r;
+                                              if (!r.destinations || r.destinations.length === 0) return r;
+                                              const nextDests = [...r.destinations];
+                                              nextDests[nextDests.length - 1] = {
+                                                ...nextDests[nextDests.length - 1],
+                                                audience: audienceTag,
+                                              };
+                                              return { ...r, destinations: nextDests };
+                                            }),
+                                          );
+                                        }}
+                                      >
+                                        Tag last
+                                      </button>
+                                    </div>
+                                  )}
+                                  <p className="text-[10px] text-slate-400">
+                                    Destinations filtered by spec’s platform; add multiples per asset and optionally tag audience.
                                   </p>
                                 </td>
                                 <td className="px-3 py-2 align-top text-center">
@@ -2892,13 +3032,18 @@ export default function Home() {
                                       <div className="flex flex-wrap gap-1">
                                         {job.destinations.map((dest) => (
                                           <span
-                                            key={`${job.job_id}-${dest.spec_id}-${dest.platform_name}`}
+                                            key={`${job.job_id}-${dest.spec_id}-${dest.platform_name}-${dest.special_notes || ''}`}
                                             className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px]"
                                           >
                                             {dest.platform_name}{' '}
                                             <span className="text-slate-400">
                                               · {dest.format_name}
                                             </span>
+                                            {dest.special_notes && (
+                                              <span className="ml-1 text-amber-700 bg-amber-50 px-1 rounded">
+                                                {dest.special_notes}
+                                              </span>
+                                            )}
                                           </span>
                                         ))}
                                       </div>
