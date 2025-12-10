@@ -424,6 +424,49 @@ const SAMPLE_MATRIX = [
   { id: "VID-002", audience: "Loyalty", trigger: "Purchase > 30d", content: "Replenish Reminder", format: "9:16 Video" },
 ];
 
+const DEMO_SPECS: Spec[] = [
+  {
+    id: 'DEMO_META_STORY',
+    platform: 'Meta',
+    placement: 'Stories / Reels',
+    width: 1080,
+    height: 1920,
+    orientation: 'Vertical',
+    media_type: 'video',
+    notes: '15s max, safe zones respected.',
+  },
+  {
+    id: 'DEMO_TIKTOK_IN_FEED',
+    platform: 'TikTok',
+    placement: 'In-Feed',
+    width: 1080,
+    height: 1920,
+    orientation: 'Vertical',
+    media_type: 'video',
+    notes: '9:16, 15-30s, include captions.',
+  },
+  {
+    id: 'DEMO_YT_BUMPER',
+    platform: 'YouTube',
+    placement: 'Bumper',
+    width: 1920,
+    height: 1080,
+    orientation: 'Horizontal',
+    media_type: 'video',
+    notes: '6s cap, :06 slate acceptable.',
+  },
+  {
+    id: 'DEMO_DISPLAY_MPU',
+    platform: 'Google Display',
+    placement: 'MPU',
+    width: 300,
+    height: 250,
+    orientation: 'Square-ish',
+    media_type: 'image_or_html5',
+    notes: 'Max 150kb, avoid dense legal.',
+  },
+];
+
 const HISTORICAL_BRIEFS: HistoricalBrief[] = [
   {
     id: "HB-001",
@@ -607,6 +650,7 @@ export default function Home() {
   const [creatingSpec, setCreatingSpec] = useState(false);
   const [createSpecError, setCreateSpecError] = useState<string | null>(null);
   const [showSpecCreator, setShowSpecCreator] = useState(false);
+  const [productionTab, setProductionTab] = useState<'requirements' | 'specLibrary'>('requirements');
   const [feedFields, setFeedFields] = useState<FeedFieldConfig[]>(BASE_FEED_FIELDS);
   const [visibleFeedFields, setVisibleFeedFields] = useState<FeedFieldKey[]>(
     BASE_FEED_FIELDS.map((f) => f.key).filter((key) => key !== 'date_start' && key !== 'date_end'),
@@ -1642,9 +1686,15 @@ export default function Home() {
         throw new Error(`Failed to load specs: ${res.status}`);
       }
       const data = await res.json();
-      setSpecs(data || []);
+      if (Array.isArray(data) && data.length) {
+        setSpecs(data);
+      } else {
+        setSpecs([]);
+      }
     } catch (e: any) {
       setSpecsError(e?.message ?? 'Unable to load specs.');
+      // Keep the UI usable in demo/offline scenarios with a sensible fallback
+      setSpecs((prev) => (prev.length ? prev : DEMO_SPECS));
     } finally {
       setLoadingSpecs(false);
     }
@@ -2131,6 +2181,30 @@ export default function Home() {
               >
                 Back to Brief
               </button>
+              {workspaceView === 'production' && (
+                <div className="hidden md:flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-0.5">
+                  <button
+                    onClick={() => setProductionTab('requirements')}
+                    className={`text-[11px] px-2 py-1 rounded-full ${
+                      productionTab === 'requirements'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Requirements
+                  </button>
+                  <button
+                    onClick={() => setProductionTab('specLibrary')}
+                    className={`text-[11px] px-2 py-1 rounded-full ${
+                      productionTab === 'specLibrary'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Spec Library
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => downloadExport('json')}
                 className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-teal-600 bg-slate-100 hover:bg-teal-50 rounded transition-colors"
@@ -2309,7 +2383,7 @@ export default function Home() {
                 </>
               )}
 
-              {workspaceView === 'production' && (
+              {workspaceView === 'production' && productionTab === 'requirements' && (
                 <div className="space-y-4">
                   {/* Production Requirements List – concept-to-spec grouper */}
                   <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -2892,6 +2966,244 @@ export default function Home() {
                               Batch: {productionBatch?.batch_name} · Campaign: {productionBatch?.campaign_id}
                             </span>
                           </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {workspaceView === 'production' && productionTab === 'specLibrary' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Spec Library
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        View, refresh, and extend the placement/spec database used by production requirements.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => loadSpecs()}
+                        disabled={loadingSpecs}
+                        className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        {loadingSpecs ? 'Refreshing…' : 'Refresh'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowSpecCreator(true)}
+                        className="px-3 py-1.5 text-[11px] rounded-full border border-teal-500 text-teal-700 bg-teal-50 hover:bg-teal-100"
+                      >
+                        + Add spec
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingSpecs && <p className="text-[11px] text-slate-400">Loading specs…</p>}
+                  {specsError && (
+                    <p className="text-[11px] text-red-500">
+                      {specsError} {specs.length ? '(showing cached/fallback list)' : ''}
+                    </p>
+                  )}
+
+                  {!loadingSpecs && specs.length === 0 && (
+                    <div className="p-4 rounded-lg border border-dashed border-slate-200 bg-white text-[11px] text-slate-500">
+                      No specs available yet. Add a placement to seed the library.
+                    </div>
+                  )}
+
+                  {specs.length > 0 && (
+                    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+                      <div className="max-h-[520px] overflow-auto">
+                        <table className="min-w-full text-[11px]">
+                          <thead className="bg-slate-50 sticky top-0 z-10">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Platform
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Placement
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Size
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Orientation
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Media Type
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
+                                Notes
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {specs.map((spec) => (
+                              <tr key={spec.id} className="odd:bg-white even:bg-slate-50/40 align-top">
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.platform}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.placement}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
+                                  {spec.width}×{spec.height}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.orientation}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.media_type}
+                                </td>
+                                <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                                  {spec.notes}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
+                          Add spec to library
+                        </p>
+                        <p className="text-[11px] text-slate-500 max-w-sm">
+                          Capture a new placement or format and make it selectable for production requirements.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSpecCreator((prev) => !prev)}
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                      >
+                        {showSpecCreator ? 'Hide form' : 'Add spec'}
+                      </button>
+                    </div>
+                    {showSpecCreator && (
+                      <div className="space-y-2">
+                        {createSpecError && (
+                          <p className="text-[11px] text-red-500">{createSpecError}</p>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Platform
+                            </label>
+                            <input
+                              className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              placeholder="Meta, TikTok, YouTube…"
+                              value={newSpecPlatform}
+                              onChange={(e) => setNewSpecPlatform(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Placement
+                            </label>
+                            <input
+                              className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              placeholder="Stories, In-Feed, Bumper…"
+                              value={newSpecPlacement}
+                              onChange={(e) => setNewSpecPlacement(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                                Width
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                placeholder="1080"
+                                value={newSpecWidth}
+                                onChange={(e) => setNewSpecWidth(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                                Height
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                placeholder="1920"
+                                value={newSpecHeight}
+                                onChange={(e) => setNewSpecHeight(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Orientation
+                            </label>
+                            <input
+                              className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              placeholder="Vertical, Horizontal, Square"
+                              value={newSpecOrientation}
+                              onChange={(e) => setNewSpecOrientation(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Media Type
+                            </label>
+                            <input
+                              className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                              placeholder="Video, Image, HTML5…"
+                              value={newSpecMediaType}
+                              onChange={(e) => setNewSpecMediaType(e.target.value)}
+                            />
+                          </div>
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Notes
+                            </label>
+                            <textarea
+                              className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
+                              rows={2}
+                              placeholder="File type, max duration, safe zones, or other guardrails."
+                              value={newSpecNotes}
+                              onChange={(e) => setNewSpecNotes(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewSpecPlatform('');
+                              setNewSpecPlacement('');
+                              setNewSpecWidth('');
+                              setNewSpecHeight('');
+                              setNewSpecOrientation('');
+                              setNewSpecMediaType('');
+                              setNewSpecNotes('');
+                            }}
+                            className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-500 bg-white hover:bg-slate-50"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={createSpec}
+                            disabled={creatingSpec}
+                            className="px-4 py-1.5 text-[11px] font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
+                          >
+                            {creatingSpec ? 'Saving…' : 'Save spec'}
+                          </button>
                         </div>
                       </div>
                     )}
