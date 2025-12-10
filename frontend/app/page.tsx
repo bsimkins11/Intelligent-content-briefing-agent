@@ -203,6 +203,7 @@ type ProductionJobRow = {
 
 type ProductionMatrixLine = {
   id: string;
+  segment_source?: string;
   audience: string;
   concept_id: string;
   spec_id: string;
@@ -652,6 +653,24 @@ const DESTINATION_OPTIONS_BY_PLATFORM: Record<string, string[]> = {
   Mobile: ['In-App Banner', 'In-App Interstitial'],
 };
 
+const PLATFORM_NATIVE_KEYWORDS: Record<string, string[]> = {
+  Meta: ['meta', 'facebook', 'instagram'],
+  TikTok: ['tiktok'],
+  YouTube: ['youtube'],
+  LinkedIn: ['linkedin'],
+  X: ['x', 'twitter'],
+  'Open Web': ['open web', 'gdn', 'dv360', 'display'],
+  CTV: ['ctv', 'dv360', 'ott'],
+  Mobile: ['mobile', 'in-app'],
+};
+
+const isAudienceNativeToPlatform = (segmentSource: string | undefined, platform: string | undefined) => {
+  if (!segmentSource || !platform) return true;
+  const keywords = PLATFORM_NATIVE_KEYWORDS[platform] || [];
+  const src = segmentSource.toLowerCase();
+  return keywords.some((kw) => src.includes(kw));
+};
+
 const deriveProductionRowsFromMatrix = (rows: MatrixRow[]): ProductionMatrixLine[] => {
   return rows.map((r, idx) => {
     const dests: DestinationEntry[] = [];
@@ -667,6 +686,7 @@ const deriveProductionRowsFromMatrix = (rows: MatrixRow[]): ProductionMatrixLine
     });
     return {
       id: `PR-${(idx + 1).toString().padStart(3, '0')}`,
+      segment_source: r.segment_source || '',
       audience: r.segment_name || `Audience ${idx + 1}`,
       concept_id: '',
       spec_id: '',
@@ -1781,6 +1801,22 @@ export default function Home() {
   async function generateProductionJobsFromBuilder() {
     // If rows exist, prefer local matrix-based generation
     if (productionMatrixRows.length > 0) {
+      const nonNative: string[] = [];
+      productionMatrixRows.forEach((row, idx) => {
+        const spec = specs.find((s) => s.id === row.spec_id);
+        const platform = spec?.platform;
+        if (!isAudienceNativeToPlatform(row.segment_source, platform)) {
+          nonNative.push(`${row.audience || `Row ${idx + 1}`} → ${platform || 'Unknown platform'}`);
+        }
+      });
+      if (nonNative.length) {
+        const proceed = window.confirm(
+          `Audience is not native to platform for:\n- ${nonNative.join(
+            '\n- ',
+          )}\nContinue anyway? (Choosing OK assumes you are importing this audience into that platform)`,
+        );
+        if (!proceed) return;
+      }
       const jobs: ProductionJobRow[] = [];
       productionMatrixRows.forEach((row, idx) => {
         const spec = specs.find((s) => s.id === row.spec_id);
@@ -2879,6 +2915,7 @@ export default function Home() {
                         <table className="w-full text-[11px] min-w-[900px]">
                           <thead className="bg-slate-50 text-slate-600 uppercase tracking-wide text-[10px]">
                             <tr>
+                              <th className="px-3 py-2 text-left">Segment Source</th>
                               <th className="px-3 py-2 text-left">Audience</th>
                               <th className="px-3 py-2 text-left">Concept</th>
                               <th className="px-3 py-2 text-left">Spec</th>
@@ -2901,6 +2938,14 @@ export default function Home() {
                               const specOptions = specs;
                               return (
                                 <tr key={row.id} className="border-t border-slate-100">
+                                  <td className="px-3 py-2 align-top">
+                                    <input
+                                      className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                      value={row.segment_source ?? ''}
+                                      onChange={(e) => updateProductionMatrixCell(index, 'segment_source' as any, e.target.value)}
+                                      placeholder="CRM, Paid Social, Search, etc."
+                                    />
+                                  </td>
                                   <td className="px-3 py-2 align-top">
                                     <input
                                       className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
