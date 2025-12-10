@@ -2414,7 +2414,7 @@ export default function Home() {
                     {builderError && (
                       <p className="text-[11px] text-red-500">{builderError}</p>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                           Creative Concept
@@ -2438,212 +2438,24 @@ export default function Home() {
                           master idea for this asset group.
                         </p>
                       </div>
-                      <div className="md:col-span-2 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                            Spec Library
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {loadingSpecs ? 'Loading…' : `${specs.length} specs`}
-                          </span>
-                        </div>
-                        <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50">
-                          {loadingSpecs && (
-                            <div className="p-3 text-[11px] text-slate-500">Loading specs…</div>
-                          )}
-                          {specsError && !loadingSpecs && (
-                            <div className="p-3 text-[11px] text-red-500">{specsError}</div>
-                          )}
-                          {!loadingSpecs && !specsError && specs.length === 0 && (
-                            <div className="p-3 text-[11px] text-slate-400">
-                              No specs available yet. Add a new placement below to seed the library.
-                            </div>
-                          )}
-                          {!loadingSpecs && !specsError && specs.length > 0 && (
-                            <div className="divide-y divide-slate-200">
-                              {Object.entries(specsByPlatform).map(([platform, rows]) => (
-                                <div key={platform} className="p-2 space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-semibold text-slate-700">
-                                      {platform}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">
-                                      {rows.length} formats
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {rows.map((spec) => {
-                                      const checked = builderSelectedSpecIds.includes(spec.id);
-                                      return (
-                                        <label
-                                          key={spec.id}
-                                          className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer hover:bg-white rounded-md px-1 py-0.5"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            className="h-3 w-3 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                            checked={checked}
-                                            onChange={() => toggleBuilderSpec(spec.id)}
-                                          />
-                                          <span className="flex-1 flex flex-col md:flex-row md:items-center md:justify-between gap-0.5">
-                                            <span>
-                                              {spec.placement}{' '}
-                                              <span className="text-slate-400">
-                                                ({spec.width}x{spec.height}, {spec.orientation})
-                                              </span>
-                                            </span>
-                                            {spec.notes && (
-                                              <span className="text-[10px] text-slate-400 md:text-right">
-                                                {spec.notes}
-                                              </span>
-                                            )}
-                                          </span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white p-3 space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
-                                Add spec to library
-                              </p>
-                              <p className="text-[11px] text-slate-500 max-w-sm">
-                                Capture a new placement or format and make it selectable for the production jobs list.
-                              </p>
-                            </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                          Selected Specs
+                        </label>
+                        <div className="p-3 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between">
+                            <span className="text-sm text-slate-600">
+                                {builderSelectedSpecIds.length} specs selected
+                            </span>
                             <button
-                              type="button"
-                              onClick={() => setShowSpecCreator((prev) => !prev)}
-                              className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                                onClick={() => setProductionTab('specLibrary')}
+                                className="text-xs text-teal-600 font-medium hover:text-teal-700 hover:underline"
                             >
-                              {showSpecCreator ? 'Hide form' : 'Add spec'}
+                                Manage in Library →
                             </button>
-                          </div>
-                          {showSpecCreator && (
-                            <div className="space-y-2">
-                              {createSpecError && (
-                                <p className="text-[11px] text-red-500">{createSpecError}</p>
-                              )}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    Platform
-                                  </label>
-                                  <input
-                                    className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                    placeholder="Meta, TikTok, YouTube…"
-                                    value={newSpecPlatform}
-                                    onChange={(e) => setNewSpecPlatform(e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    Placement
-                                  </label>
-                                  <input
-                                    className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                    placeholder="Stories, In-Feed, Bumper…"
-                                    value={newSpecPlacement}
-                                    onChange={(e) => setNewSpecPlacement(e.target.value)}
-                                  />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                      Width
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                      placeholder="1080"
-                                      value={newSpecWidth}
-                                      onChange={(e) => setNewSpecWidth(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                      Height
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                      placeholder="1920"
-                                      value={newSpecHeight}
-                                      onChange={(e) => setNewSpecHeight(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    Orientation
-                                  </label>
-                                  <input
-                                    className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                    placeholder="Vertical, Horizontal, Square"
-                                    value={newSpecOrientation}
-                                    onChange={(e) => setNewSpecOrientation(e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    Media Type
-                                  </label>
-                                  <input
-                                    className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                    placeholder="Video, Image, HTML5…"
-                                    value={newSpecMediaType}
-                                    onChange={(e) => setNewSpecMediaType(e.target.value)}
-                                  />
-                                </div>
-                                <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    Notes
-                                  </label>
-                                  <textarea
-                                    className="w-full text-[11px] border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
-                                    rows={2}
-                                    placeholder="File type, max duration, safe zones, or other guardrails."
-                                    value={newSpecNotes}
-                                    onChange={(e) => setNewSpecNotes(e.target.value)}
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setNewSpecPlatform('');
-                                    setNewSpecPlacement('');
-                                    setNewSpecWidth('');
-                                    setNewSpecHeight('');
-                                    setNewSpecOrientation('');
-                                    setNewSpecMediaType('');
-                                    setNewSpecNotes('');
-                                  }}
-                                  className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-500 bg-white hover:bg-slate-50"
-                                >
-                                  Clear
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={createSpec}
-                                  disabled={creatingSpec}
-                                  className="px-4 py-1.5 text-[11px] font-semibold rounded-full bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
-                                >
-                                  {creatingSpec ? 'Saving…' : 'Save spec'}
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </div>
+                        <p className="text-[11px] text-slate-500">
+                          Select the target formats for this production run in the Spec Library.
+                        </p>
                       </div>
                     </div>
 
@@ -2981,7 +2793,7 @@ export default function Home() {
                         Spec Library
                       </h3>
                       <p className="text-[11px] text-slate-500">
-                        View, refresh, and extend the placement/spec database used by production requirements.
+                        Select placements for the current production run. View, refresh, and extend the spec database.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -3022,6 +2834,9 @@ export default function Home() {
                         <table className="min-w-full text-[11px]">
                           <thead className="bg-slate-50 sticky top-0 z-10">
                             <tr>
+                              <th className="w-8 px-3 py-2 border-b border-slate-200 bg-slate-50">
+                                <span className="sr-only">Select</span>
+                              </th>
                               <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-slate-200">
                                 Platform
                               </th>
@@ -3044,7 +2859,15 @@ export default function Home() {
                           </thead>
                           <tbody>
                             {specs.map((spec) => (
-                              <tr key={spec.id} className="odd:bg-white even:bg-slate-50/40 align-top">
+                              <tr key={spec.id} className="odd:bg-white even:bg-slate-50/40 align-top hover:bg-slate-50">
+                                <td className="px-3 py-2 border-b border-slate-100 text-center">
+                                  <input
+                                    type="checkbox"
+                                    className="h-3 w-3 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                    checked={builderSelectedSpecIds.includes(spec.id)}
+                                    onChange={() => toggleBuilderSpec(spec.id)}
+                                  />
+                                </td>
                                 <td className="px-3 py-2 border-b border-slate-100 text-slate-700">
                                   {spec.platform}
                                 </td>
