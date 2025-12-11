@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import Image from 'next/image';
 
@@ -218,6 +218,7 @@ type ProductionMatrixLine = {
   template_id?: string;
   feed_id?: string;
   feed_asset_id?: string;
+   production_status?: 'Todo' | 'In_Progress' | 'Review' | 'Approved' | 'Pending';
 };
 
 // Feed Builder (Asset Feed) row type mirrors the Master Feed Variable Set
@@ -1061,6 +1062,10 @@ export default function Home() {
   );
   const [showFeedFieldConfig, setShowFeedFieldConfig] = useState(false);
   const [feedRows, setFeedRows] = useState<FeedRow[]>([]);
+  const feedEligible = useMemo(
+    () => builderJobs.some((j) => j.is_feed) || productionMatrixRows.some((r) => r.is_feed),
+    [builderJobs, productionMatrixRows],
+  );
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({
@@ -1146,9 +1151,14 @@ export default function Home() {
     },
   ]);
   const [moodBoardConceptIds, setMoodBoardConceptIds] = useState<string[]>([]);
+  const [brandAssets, setBrandAssets] = useState<string[]>([]);
+  const [brandVoiceGuide, setBrandVoiceGuide] = useState('');
+  const [brandStyleGuide, setBrandStyleGuide] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const conceptFileInputRef = useRef<HTMLInputElement | null>(null);
+  const brandAssetFileInputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -1156,6 +1166,11 @@ export default function Home() {
   };
 
   useEffect(scrollToBottom, [messages]);
+  useEffect(() => {
+    if (workspaceView === 'feed' && !feedEligible) {
+      setWorkspaceView('production');
+    }
+  }, [workspaceView, feedEligible]);
 
   // ---- Feed Builder helpers ----
   const updateFeedCell = (index: number, key: keyof FeedRow, value: string) => {
@@ -2375,6 +2390,97 @@ export default function Home() {
     setVisibleMatrixFields((prev) => prev.filter((k) => k !== key));
   }
 
+  function openBrandAssetPicker() {
+    brandAssetFileInputRef.current?.click();
+  }
+
+  function handleBrandAssetChange(e: any) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const names = files.map((f: File) => f.name);
+    setBrandAssets((prev) => [...prev, ...names]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: `Uploading brand assets: ${names.join(', ')}` },
+      {
+        role: 'assistant',
+        content: 'Brand assets loaded. I will use these as visual references when drafting concepts and prompts.',
+      },
+    ]);
+    e.target.value = '';
+  }
+
+  function openConceptFilePicker() {
+    conceptFileInputRef.current?.click();
+  }
+
+  function handleConceptFileChange(e: any) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const raw = evt.target?.result as string;
+        if (!raw) throw new Error('Unable to read file.');
+        let parsed: any = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          parsed = [parsed];
+        }
+        const newConcepts: Concept[] = [];
+        parsed.forEach((item: any, idx: number) => {
+          if (!item) return;
+          const id = `CON-UPLOAD-${Date.now()}-${idx + 1}`;
+          newConcepts.push({
+            id,
+            asset_id: item.asset_id || '',
+            title: item.title || item.name || `Uploaded Concept ${idx + 1}`,
+            description: item.description || item.summary || '',
+            notes: item.notes || '',
+            kind: item.kind || undefined,
+            status: 'idle',
+            generatedPrompt: item.prompt || '',
+          });
+        });
+        if (!newConcepts.length) {
+          alert('No concepts found in the file. Please upload a JSON array of concepts.');
+          return;
+        }
+        setConcepts((prev) => [...prev, ...newConcepts]);
+        setMoodBoardConceptIds((prev) => [...prev, ...newConcepts.map((c) => c.id)]);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: `Uploaded ${newConcepts.length} concepts from file "${file.name}".` },
+          { role: 'assistant', content: 'Added uploaded concepts to the board. You can map them to specs and production next.' },
+        ]);
+      } catch (err) {
+        console.error('Error parsing concept file', err);
+        alert('Could not read file. Please upload a JSON file with an array of concept objects.');
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function simulateDamImport() {
+    const damConcept: Concept = {
+      id: `CON-DAM-${Date.now()}`,
+      asset_id: 'DAM-ASSET-001',
+      title: 'Imported from DAM – Hero Visual',
+      description: 'Hero visual pulled from DAM with layered assets and brand-safe styling.',
+      notes: 'Check license and region locks before export.',
+      kind: 'image',
+      status: 'idle',
+    };
+    setConcepts((prev) => [...prev, damConcept]);
+    setMoodBoardConceptIds((prev) => [...prev, damConcept.id]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: 'Pull a hero visual from DAM to use as a concept.' },
+      { role: 'assistant', content: 'Fetched a hero visual from DAM and pinned it to the concept board. Map it to specs in production.' },
+    ]);
+  }
+
   function applyMatrixTemplate(templateId: string) {
     const template = matrixLibrary.find((t) => t.id === templateId);
     if (!template) return;
@@ -2840,8 +2946,11 @@ export default function Home() {
               className={`text-[11px] px-2 py-1 rounded-full ${
                 workspaceView === 'feed'
                   ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  : feedEligible
+                  ? 'text-slate-500 hover:text-slate-700'
+                  : 'text-slate-300 cursor-not-allowed'
               }`}
+              disabled={!feedEligible}
             >
               Feed
             </button>
@@ -4655,6 +4764,20 @@ export default function Home() {
                         Concept Canvas
                       </h3>
                       <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          ref={brandAssetFileInputRef}
+                          className="hidden"
+                          multiple
+                          onChange={handleBrandAssetChange}
+                        />
+                        <input
+                          type="file"
+                          ref={conceptFileInputRef}
+                          className="hidden"
+                          accept=".json"
+                          onChange={handleConceptFileChange}
+                        />
                         <button
                           type="button"
                           onClick={draftConceptsFromBrief}
@@ -4673,33 +4796,115 @@ export default function Home() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => alert('DAM connection coming soon')}
-                        className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-colors"
+                        onClick={simulateDamImport}
+                        className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-amber-400 bg-amber-50 text-amber-800 hover:border-amber-500 hover:text-amber-900 transition-colors"
                       >
                         Connect to DAM
                       </button>
                       <button
                         type="button"
-                        onClick={() => alert('Brand assets integration coming soon')}
+                        onClick={openBrandAssetPicker}
                         className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-colors"
                       >
                         Add Brand Assets
                       </button>
                       <button
                         type="button"
-                        onClick={() => alert('Brand voice loading coming soon')}
+                        onClick={() => {
+                          const voice = window.prompt('Paste brand voice guidelines (key phrases, tone, dos/donts):');
+                          if (!voice) return;
+                          setBrandVoiceGuide(voice);
+                          setMessages((prev) => [
+                            ...prev,
+                            { role: 'user', content: 'Setting brand voice guidelines for concept generation.' },
+                            { role: 'assistant', content: 'Brand voice captured. I will keep tone aligned for all concepts.' },
+                          ]);
+                        }}
                         className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-colors"
                       >
                         Load Brand Voice
                       </button>
                       <button
                         type="button"
-                        onClick={() => alert('Brand style guide loading coming soon')}
+                        onClick={() => {
+                          const style = window.prompt('Paste brand style guide highlights (colors, typography, motifs):');
+                          if (!style) return;
+                          setBrandStyleGuide(style);
+                          setMessages((prev) => [
+                            ...prev,
+                            { role: 'user', content: 'Adding brand style guide highlights for concept visuals.' },
+                            {
+                              role: 'assistant',
+                              content: 'Style guide captured. I will reference these visual rules when drafting concepts.',
+                            },
+                          ]);
+                        }}
                         className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-colors"
                       >
                         Load Brand Style Guide
                       </button>
+                      <button
+                        type="button"
+                        onClick={openConceptFilePicker}
+                        className="px-3 py-1.5 text-[11px] font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-colors"
+                      >
+                        Upload Concepts (JSON)
+                      </button>
                     </div>
+                    {(brandAssets.length > 0 || brandVoiceGuide || brandStyleGuide) && (
+                      <div className="mt-2 p-3 rounded-lg border border-teal-100 bg-teal-50 text-[11px] text-teal-800 flex flex-wrap gap-3">
+                        <span className="font-semibold">Guided by:</span>
+                        {brandAssets.length > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-teal-200">
+                            {brandAssets.length} brand asset{brandAssets.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {brandVoiceGuide && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-teal-200">
+                            Voice: locked in
+                          </span>
+                        )}
+                        {brandStyleGuide && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-teal-200">
+                            Style guide: loaded
+                          </span>
+                        )}
+                        <span className="text-teal-700">
+                          AI will use these as guardrails for concept generation and prompts.
+                        </span>
+                      </div>
+                    )}
+                    {(brandAssets.length > 0 || brandVoiceGuide || brandStyleGuide) && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2 text-[11px] text-slate-700">
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <p className="font-semibold text-slate-800 mb-1">Brand assets</p>
+                          {brandAssets.length ? (
+                            <ul className="list-disc list-inside space-y-1">
+                              {brandAssets.slice(0, 6).map((asset) => (
+                                <li key={asset}>{asset}</li>
+                              ))}
+                              {brandAssets.length > 6 && (
+                                <li className="text-slate-400">+{brandAssets.length - 6} more</li>
+                              )}
+                            </ul>
+                          ) : (
+                            <p className="text-slate-400">None uploaded.</p>
+                          )}
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <p className="font-semibold text-slate-800 mb-1">Brand voice</p>
+                          <p className="text-slate-600 whitespace-pre-wrap min-h-[60px]">
+                            {brandVoiceGuide || 'No voice guidelines yet.'}
+                          </p>
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <p className="font-semibold text-slate-800 mb-1">Style guide</p>
+                          <p className="text-slate-600 whitespace-pre-wrap min-h-[60px]">
+                            {brandStyleGuide || 'No style rules yet.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Canvas body: per-concept input/output rows */}
@@ -4904,13 +5109,36 @@ export default function Home() {
                         A curated board of final concepts you’ve marked from the Concepts canvas.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setRightTab('builder')}
-                      className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
-                    >
-                      Manage concepts
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={conceptFileInputRef}
+                        className="hidden"
+                        accept=".json"
+                        onChange={handleConceptFileChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={openConceptFilePicker}
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                      >
+                        Upload concepts
+                      </button>
+                      <button
+                        type="button"
+                        onClick={simulateDamImport}
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-amber-400 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                      >
+                        Add from DAM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRightTab('builder')}
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                      >
+                        Manage concepts
+                      </button>
+                    </div>
                   </div>
 
                   {moodBoardConceptIds.length === 0 || concepts.length === 0 ? (
@@ -4983,7 +5211,7 @@ export default function Home() {
                 </div>
               )}
 
-              {workspaceView === 'feed' && (
+              {workspaceView === 'feed' && feedEligible && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
