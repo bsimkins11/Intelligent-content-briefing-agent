@@ -195,7 +195,9 @@ type ProductionJobRow = {
   technical_summary: string;
   status: string;
   // feed/build meta captured later in UI, not required from generator
+  is_feed?: boolean;
   feed_template?: string;
+  template_id?: string;
   feed_id?: string;
   feed_asset_id?: string;
   production_details?: string;
@@ -346,6 +348,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 1',
     segment_description: 'Recent Amazon purchasers of running shoes/accessories.',
     key_insight: 'Ready to repurchase on replenishment cadence; care about price + speed.',
+    current_perception: 'See us as a safe mid-tier option; default to Prime deals.',
+    desired_perception: 'We’re the best performance-for-value option with Prime-fast delivery.',
+    primary_message_pillar: 'Value + speed: race-day comfort with Prime convenience.',
+    call_to_action_objective: 'Buy now on Amazon',
+    tone_guardrails: 'Value-forward, straightforward, avoid heavy jargon.',
     platform_environments: 'Amazon, Open Web',
     contextual_triggers: '30/60/90-day purchase windows',
     notes: 'Lead with “Prime fast” + comfort; show price/value.',
@@ -358,6 +365,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 1',
     segment_description: 'Site visitors who abandoned cart on racing models.',
     key_insight: 'High intent but need reassurance on fit/return policy.',
+    current_perception: 'Worried shoe may not fit or returns are a hassle.',
+    desired_perception: 'Confident they’ll nail the fit and can return easily.',
+    primary_message_pillar: 'Fit assurance + risk-free checkout.',
+    call_to_action_objective: 'Complete purchase',
+    tone_guardrails: 'Reassuring, concise, proof-driven on fit/returns.',
     platform_environments: 'Meta',
     contextual_triggers: 'Cart abandon events, 48-hr window',
     notes: 'Use dynamic product feed; highlight free returns.',
@@ -370,6 +382,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 2',
     segment_description: '3P segments of endurance/fitness content consumers.',
     key_insight: 'Respond to performance proof and athlete validation.',
+    current_perception: 'View us as solid but not the most performance-proven.',
+    desired_perception: 'Believe we’re race-proven with data and athlete backing.',
+    primary_message_pillar: 'Performance receipts: splits, cushioning tech, athlete quotes.',
+    call_to_action_objective: 'Explore performance lineup',
+    tone_guardrails: 'Proof-first, athletic, avoid fluff.',
     platform_environments: 'DV360, YouTube, CTV',
     contextual_triggers: 'Sports highlights, fitness content, CTV sports slots',
     notes: 'Lean on pro/coach voiceover; show split times.',
@@ -382,6 +399,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 2',
     segment_description: 'Modeled lookalikes off CRM heavy buyers.',
     key_insight: 'Similar buying power; need proof this is “worth switching.”',
+    current_perception: 'Loyal to incumbent brands; not convinced to switch.',
+    desired_perception: 'See clear upside in switching for speed + perks.',
+    primary_message_pillar: 'Switch incentive + performance upgrade story.',
+    call_to_action_objective: 'Claim loyalty offer',
+    tone_guardrails: 'Confident, value-positive, avoid heavy discounting language.',
     platform_environments: 'Meta, TikTok, YouTube',
     contextual_triggers: 'Seasonal sale windows, race weekends',
     notes: 'Price + performance bundles; show loyalty perks.',
@@ -394,6 +416,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 3',
     segment_description: 'HH-level runners buying for family (2+ pairs).',
     key_insight: 'Value durability + deals for multiple pairs.',
+    current_perception: 'Assume performance shoes are pricey for households.',
+    desired_perception: 'Believe bundles make premium performance affordable for family.',
+    primary_message_pillar: 'Durable mileage + bundle value for households.',
+    call_to_action_objective: 'Shop family bundle',
+    tone_guardrails: 'Practical, warm, avoid overly technical claims.',
     platform_environments: 'CTV, Open Web, Meta',
     contextual_triggers: 'Back-to-school, holiday gifting',
     notes: 'Bundle offers; family/household creative frames.',
@@ -406,6 +433,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 3',
     segment_description: 'HR/benefits leaders exploring wellness stipends.',
     key_insight: 'Care about employee engagement + perk differentiation.',
+    current_perception: 'See us as consumer-first; unsure about workplace fit.',
+    desired_perception: 'View us as a turnkey wellness perk that boosts engagement.',
+    primary_message_pillar: 'Employee perk value + easy rollout.',
+    call_to_action_objective: 'Book a perks consult',
+    tone_guardrails: 'Professional, outcomes-focused, avoid hype.',
     platform_environments: 'LinkedIn, Open Web',
     contextual_triggers: 'Budget planning, benefit cycle',
     notes: 'Emphasize perk value and participation; softer CTA.',
@@ -418,6 +450,11 @@ const INITIAL_STRATEGY_MATRIX_RUNNING_SHOES: MatrixRow[] = [
     priority_level: 'Tier 2',
     segment_description: 'TikTok users engaging with running/fitness creators.',
     key_insight: 'React to authentic creator POV and gear breakdowns.',
+    current_perception: 'Think our ads feel polished but less authentic.',
+    desired_perception: 'Trust creator-led proofs that our shoes perform.',
+    primary_message_pillar: 'Creator-tested performance stories.',
+    call_to_action_objective: 'Watch the collab + shop featured shoe',
+    tone_guardrails: 'Authentic, energetic, avoid corporate polish.',
     platform_environments: 'TikTok, Meta',
     contextual_triggers: 'Creator collabs, race recaps',
     notes: 'Use creator-led hooks; unboxings and on-foot tests.',
@@ -961,6 +998,7 @@ export default function Home() {
   const [jobFeedMeta, setJobFeedMeta] = useState<{
     [jobId: string]: {
       feed_template?: string;
+      template_id?: string;
       feed_id?: string;
       feed_asset_id?: string;
       production_details?: string;
@@ -1872,6 +1910,20 @@ export default function Home() {
     setProductionMatrixRows((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const updateJobFeedMeta = (
+    jobId: string,
+    field: 'feed_template' | 'template_id' | 'feed_id' | 'feed_asset_id' | 'production_details',
+    value: string,
+  ) => {
+    setJobFeedMeta((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...prev[jobId],
+        [field]: value,
+      },
+    }));
+  };
+
   const sendSpecsToProduction = () => {
     // Move to the Requirements tab and, if possible, generate jobs immediately.
     setProductionTab('requirements');
@@ -1902,6 +1954,15 @@ export default function Home() {
         if (!proceed) return;
       }
       const jobs: ProductionJobRow[] = [];
+      const nextJobFeedMeta: {
+        [jobId: string]: {
+          feed_template?: string;
+          template_id?: string;
+          feed_id?: string;
+          feed_asset_id?: string;
+          production_details?: string;
+        };
+      } = {};
       productionMatrixRows.forEach((row, idx) => {
         const spec = specs.find((s) => s.id === row.spec_id);
         const concept = concepts.find((c) => c.id === row.concept_id);
@@ -1919,16 +1980,31 @@ export default function Home() {
           format_name: spec?.placement || spec?.media_type || '',
           special_notes: dest.audience ? `Audience: ${dest.audience}` : row.notes,
         }));
+        const jobId = row.id || `JOB-${idx + 1}`;
+        nextJobFeedMeta[jobId] = {
+          feed_template: row.feed_template || '',
+          template_id: row.template_id || '',
+          feed_id: row.feed_id || '',
+          feed_asset_id: row.feed_asset_id || '',
+          production_details: row.production_details || '',
+        };
         jobs.push({
-          job_id: row.id || `JOB-${idx + 1}`,
+          job_id: jobId,
           creative_concept: conceptLabel,
           asset_type: spec?.media_type || 'asset',
           destinations,
           technical_summary: `${specLabel}${metaSuffix}`,
           status: 'Pending',
+          is_feed: row.is_feed,
+          feed_template: row.feed_template,
+          template_id: row.template_id,
+          feed_id: row.feed_id,
+          feed_asset_id: row.feed_asset_id,
+          production_details: row.production_details,
         });
       });
       setBuilderJobs(jobs);
+      setJobFeedMeta(nextJobFeedMeta);
       setBuilderError(null);
       setProductionTab('requirements');
       setShowJobs(true);
@@ -1958,6 +2034,7 @@ export default function Home() {
       }
       const data = await res.json();
       setBuilderJobs(data.jobs || []);
+      setJobFeedMeta({});
     } catch (e: any) {
       console.error('Error generating production jobs', e);
       setBuilderError(e?.message ?? 'Unable to generate production list from backend.');
@@ -2975,7 +3052,7 @@ export default function Home() {
                             Production Requirements Matrix
                           </h3>
                           <p className="text-[11px] text-slate-500 max-w-xl">
-                            Connect audiences to concepts and specs line-by-line. This feeds the production list builder without a traffic sheet.
+                            Connect audiences to concepts and specs line-by-line. This feeds the production list builder without a traffic sheet. Feed template/ID details now live in Production Jobs under Build Details.
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -3005,10 +3082,6 @@ export default function Home() {
                               <th className="px-3 py-2 text-left">Spec</th>
                               <th className="px-3 py-2 text-left">Destinations (by spec)</th>
                               <th className="px-3 py-2 text-left">Feed?</th>
-                              <th className="px-3 py-2 text-left">Feed Template</th>
-                              <th className="px-3 py-2 text-left">Template ID</th>
-                              <th className="px-3 py-2 text-left">Feed ID</th>
-                              <th className="px-3 py-2 text-left">Feed Asset ID</th>
                               <th className="px-3 py-2 text-left">Production Details (non-feed)</th>
                               <th className="px-3 py-2 text-left">Notes</th>
                               <th className="px-3 py-2 text-right"></th>
@@ -3194,58 +3267,6 @@ export default function Home() {
                                     />
                                   </td>
                                   <td className="px-3 py-2 align-top">
-                                    {row.is_feed ? (
-                                      <input
-                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                        value={row.feed_template}
-                                        onChange={(e) =>
-                                          updateProductionMatrixCell(index, 'feed_template', e.target.value)
-                                        }
-                                        placeholder="Feed/DCO template name"
-                                      />
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Toggle Feed to add</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 align-top">
-                                    {row.is_feed ? (
-                                      <input
-                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                        value={row.template_id ?? ''}
-                                        onChange={(e) => updateProductionMatrixCell(index, 'template_id', e.target.value)}
-                                        placeholder="Template ID"
-                                      />
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Feed off</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 align-top">
-                                    {row.is_feed ? (
-                                      <input
-                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                        value={row.feed_id ?? ''}
-                                        onChange={(e) => updateProductionMatrixCell(index, 'feed_id', e.target.value)}
-                                        placeholder="Feed ID"
-                                      />
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Feed off</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 align-top">
-                                    {row.is_feed ? (
-                                      <input
-                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                        value={row.feed_asset_id ?? ''}
-                                        onChange={(e) =>
-                                          updateProductionMatrixCell(index, 'feed_asset_id', e.target.value)
-                                        }
-                                        placeholder="Asset ID in feed"
-                                      />
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Feed off</span>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-2 align-top">
                                     <textarea
                                       className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500 resize-none"
                                       rows={2}
@@ -3391,7 +3412,7 @@ export default function Home() {
                                     <th className="py-1.5 pr-4 font-semibold">Production Asset</th>
                                     <th className="py-1.5 pr-4 font-semibold">Tech Specs</th>
                                     <th className="py-1.5 pr-4 font-semibold">Destinations</th>
-                                    <th className="py-1.5 pr-4 font-semibold">Specs</th>
+                                    <th className="py-1.5 pr-4 font-semibold">Build Details</th>
                                     <th className="py-1.5 pr-4 font-semibold">Requirements</th>
                                     <th className="py-1.5 pr-4 font-semibold">Status</th>
                                   </tr>
@@ -3402,6 +3423,8 @@ export default function Home() {
                                       new Set(job.destinations.map((d) => d.special_notes).filter(Boolean)),
                                     );
                                     const requirementsValue = jobRequirements[job.job_id] ?? '';
+                                    const meta = jobFeedMeta[job.job_id] || {};
+                                    const isFeed = job.is_feed;
                                     return (
                                       <tr key={job.job_id} className="border-b border-slate-100 align-top">
                                         <td className="py-1.5 pr-4">
@@ -3433,8 +3456,58 @@ export default function Home() {
                                             ))}
                                           </div>
                                         </td>
-                                        <td className="py-1.5 pr-4 text-slate-500 text-[10px]">
-                                          {job.technical_summary}
+                                        <td className="py-1.5 pr-4 text-slate-700">
+                                          {isFeed ? (
+                                            <div className="space-y-1.5">
+                                              <div className="flex gap-2">
+                                                <input
+                                                  className="w-1/2 border border-slate-300 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                                  placeholder="Feed template"
+                                                  value={meta.feed_template ?? job.feed_template ?? ''}
+                                                  onChange={(e) =>
+                                                    updateJobFeedMeta(job.job_id, 'feed_template', e.target.value)
+                                                  }
+                                                />
+                                                <input
+                                                  className="w-1/2 border border-slate-300 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                                  placeholder="Template ID"
+                                                  value={meta.template_id ?? job.template_id ?? ''}
+                                                  onChange={(e) =>
+                                                    updateJobFeedMeta(job.job_id, 'template_id', e.target.value)
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="flex gap-2">
+                                                <input
+                                                  className="w-1/2 border border-slate-300 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                                  placeholder="Feed ID"
+                                                  value={meta.feed_id ?? job.feed_id ?? ''}
+                                                  onChange={(e) => updateJobFeedMeta(job.job_id, 'feed_id', e.target.value)}
+                                                />
+                                                <input
+                                                  className="w-1/2 border border-slate-300 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                                  placeholder="Feed asset ID"
+                                                  value={meta.feed_asset_id ?? job.feed_asset_id ?? ''}
+                                                  onChange={(e) =>
+                                                    updateJobFeedMeta(job.job_id, 'feed_asset_id', e.target.value)
+                                                  }
+                                                />
+                                              </div>
+                                              <p className="text-[10px] text-slate-400">
+                                                Feed build details live here (template, IDs). Kept out of the plan table.
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <textarea
+                                              className="w-full min-w-[200px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                                              rows={3}
+                                              placeholder="File type, safe zones, animation asks."
+                                              value={meta.production_details ?? job.production_details ?? ''}
+                                              onChange={(e) =>
+                                                updateJobFeedMeta(job.job_id, 'production_details', e.target.value)
+                                              }
+                                            />
+                                          )}
                                         </td>
                                         <td className="py-1.5 pr-4 text-slate-700">
                                           <textarea
@@ -3453,6 +3526,9 @@ export default function Home() {
                                               }))
                                             }
                                           />
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-slate-500 text-[11px]">
+                                          {job.status}
                                         </td>
                                       </tr>
                                     );
