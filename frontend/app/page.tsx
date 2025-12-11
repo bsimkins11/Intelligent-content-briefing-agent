@@ -3748,51 +3748,91 @@ export default function Home() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {['Todo', 'In_Progress', 'Review', 'Approved'].map((col) => (
-                              <div
-                                key={col}
-                                className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-2"
-                              >
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
-                                    {col === 'In_Progress'
-                                      ? 'In Progress'
-                                      : col === 'Review'
-                                      ? 'In Review'
-                                      : col}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">
-                                    {productionAssets.filter((a) => a.status === col).length}
-                                  </span>
-                                </div>
-                                <div className="space-y-2">
-                                  {productionAssets
-                                    .filter((a) => a.status === col)
-                                    .map((asset) => (
-                                      <button
-                                        key={asset.id}
-                                        type="button"
-                                        onClick={() => setSelectedAsset(asset)}
-                                        className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors"
-                                      >
-                                        <div className="flex items-center justify-between gap-2">
-                                          <div className="min-w-0">
-                                            <p className="text-[11px] font-semibold text-slate-800 truncate">
-                                              {asset.asset_name}
-                                            </p>
-                                            <p className="text-[10px] text-slate-500 truncate">
-                                              {asset.platform} · {asset.placement}
-                                            </p>
-                                          </div>
-                                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
-                                            {asset.asset_type}
-                                          </span>
-                                        </div>
-                                      </button>
-                                    ))}
-                                </div>
-                              </div>
-                            ))}
+                            {['Todo', 'In_Progress', 'Review', 'Approved'].map((col) => {
+                                // Filter assets for this column
+                                const colAssets = productionAssets.filter((a) => a.status === col);
+                                // Filter pending jobs for Todo column (jobs that haven't been turned into assets yet)
+                                const colJobs = col === 'Todo' ? builderJobs.filter(j => j.status === 'Pending') : [];
+                                
+                                return (
+                                  <div
+                                    key={col}
+                                    className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-2"
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                                        {col === 'In_Progress'
+                                          ? 'In Progress'
+                                          : col === 'Review'
+                                          ? 'In Review'
+                                          : col}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {colAssets.length + colJobs.length}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {colAssets.map((asset) => (
+                                          <button
+                                            key={asset.id}
+                                            type="button"
+                                            onClick={() => setSelectedAsset(asset)}
+                                            className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="min-w-0">
+                                                <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                                  {asset.asset_name}
+                                                </p>
+                                                <p className="text-[10px] text-slate-500 truncate">
+                                                  {asset.platform} · {asset.placement}
+                                                </p>
+                                                {/* Show spec dimensions if available */}
+                                                {asset.spec_dimensions && (
+                                                  <p className="text-[9px] text-slate-400">
+                                                    {asset.spec_dimensions}
+                                                  </p>
+                                                )}
+                                              </div>
+                                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
+                                                {asset.asset_type}
+                                              </span>
+                                            </div>
+                                          </button>
+                                        ))}
+                                      {/* Add Pending Jobs to Todo Column */}
+                                      {colJobs.map((job) => (
+                                          <button
+                                            key={job.job_id}
+                                            type="button"
+                                            className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 hover:border-teal-400 hover:bg-teal-50 transition-colors opacity-70"
+                                            onClick={() => {
+                                              // Optional: Expand job details on click or promote to active asset
+                                              alert(`Job ID: ${job.job_id}\nUse "Generate Plan" to formalize this into a tracked asset.`);
+                                            }}
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="min-w-0">
+                                                <p className="text-[11px] font-semibold text-slate-800 truncate">
+                                                  {job.creative_concept}
+                                                </p>
+                                                <p className="text-[10px] text-slate-500 truncate">
+                                                   {job.destinations.length} destination(s)
+                                                </p>
+                                                <p className="text-[9px] text-slate-400 truncate">
+                                                   {job.technical_summary}
+                                                </p>
+                                              </div>
+                                              <span className="text-[9px] px-1.5 py-0.5 rounded border border-dashed border-slate-300 text-slate-500">
+                                                Planned
+                                              </span>
+                                            </div>
+                                          </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                            })}
                           </div>
                         )}
                       </>
