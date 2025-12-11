@@ -1542,11 +1542,17 @@ export default function Home() {
         });
       }
       const text = lines.join('\n') + '\n';
-      const blob = new Blob([text], { type: 'text/plain' });
+      const mime =
+        format === 'json'
+          ? 'application/json'
+          : format === 'pdf'
+          ? 'application/pdf'
+          : 'text/plain';
+      const blob = new Blob([text], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `brief.${format === 'pdf' ? 'txt' : format}`;
+      a.download = `brief.${format}`;
       a.click();
       return;
     }
@@ -2225,6 +2231,37 @@ export default function Home() {
     });
   }
 
+  function loadHistoricalBrief(brief: HistoricalBrief) {
+    setPreviewPlan((prev: any) => ({
+      ...prev,
+      campaign_name: brief.campaign_name,
+      single_minded_proposition: brief.single_minded_proposition,
+      primary_audience: brief.primary_audience,
+      narrative_brief: brief.narrative_brief,
+    }));
+    setBriefState({
+      campaign_name: brief.campaign_name,
+      smp: brief.single_minded_proposition,
+      audiences: [brief.primary_audience],
+      kpis: [],
+      flight_dates: {},
+      status: 'Draft',
+    });
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: `Load the historical brief for ${brief.campaign_name} so we can reuse its structure.`,
+      },
+      {
+        role: 'assistant',
+        content:
+          'Loaded the historical brief into the form. You can edit fields or export immediately; matrix and concepts will pick this up.',
+      },
+    ]);
+    setShowLibrary(false);
+  }
+
   function updateBriefFieldValue(key: BriefFieldKey, value: string) {
     setPreviewPlan((prev: any) => ({
       ...prev,
@@ -2236,6 +2273,26 @@ export default function Home() {
     if (!demoMode) return;
     setLoading(true);
 
+    const extraFields: BriefFieldConfig[] = [
+      { key: 'audience_subsegments', label: 'Audience Sub-segments', multiline: true, isCustom: true },
+      { key: 'mandatories', label: 'Mandatories', multiline: true, isCustom: true },
+      { key: 'tone_voice', label: 'Tone / Voice', multiline: true, isCustom: true },
+      { key: 'offers', label: 'Offers & CTAs', multiline: true, isCustom: true },
+      { key: 'proof_points', label: 'Proof Points', multiline: true, isCustom: true },
+    ];
+
+    // Merge in extra brief fields for the demo without duplicating existing keys
+    setBriefFields((prev) => {
+      const existingKeys = new Set(prev.map((f) => f.key));
+      const merged = [...prev];
+      extraFields.forEach((f) => {
+        if (!existingKeys.has(f.key)) {
+          merged.push(f);
+        }
+      });
+      return merged;
+    });
+
     setMessages((prev) => [
       ...prev,
       {
@@ -2244,7 +2301,13 @@ export default function Home() {
       },
       {
         role: 'assistant',
-        content: 'Drafting a running shoe performance brief with modular content hooks. I will populate the brief form on the right.',
+        content:
+          'Absolutely. I will draft the brief, add missing fields, and populate the form on the right so you can move straight into the matrix and production.',
+      },
+      {
+        role: 'assistant',
+        content:
+          'Filling in campaign name, SMP, audience, tone, offers, and proof points now. I will also tag mandatories and sub-segments for targeting.',
       },
     ]);
 
@@ -2254,6 +2317,11 @@ export default function Home() {
       single_minded_proposition: RUNNING_SHOE_DEMO_BRIEF.smp,
       primary_audience: RUNNING_SHOE_DEMO_BRIEF.primaryAudience,
       narrative_brief: RUNNING_SHOE_DEMO_BRIEF.narrative,
+      audience_subsegments: '- Run Club Loyalists (30+ mi/week)\n- Trail Explorers (technical terrain)\n- New-to-running 5k starters',
+      mandatories: '- Show outsole/stability close-ups\n- Include captions for sound-off\n- Avoid medical claims; highlight fit guarantee',
+      tone_voice: 'Confident, proof-first, no hype; coach-like clarity with short verbs.',
+      offers: 'Race-day bundle offer; Fit Quiz CTA for new runners; Loyalty perk for repeat buyers.',
+      proof_points: 'Recent PR improvements (+12s/mi avg), athlete quotes, lab-tested cushioning data.',
     }));
 
     setBriefState({
@@ -2265,7 +2333,46 @@ export default function Home() {
       status: 'Draft',
     });
 
-    setTimeout(() => setLoading(false), 300);
+    // Simulate quick back-and-forth to feel like co-editing the brief
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          content: 'Can we make sure tone is proof-first and not hypey?',
+        },
+        {
+          role: 'assistant',
+          content: 'Updated tone to proof-first, coach-like, short verbs. Added mandatories and offers to the form.',
+        },
+      ]);
+    }, 350);
+
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          content: 'Add a loyalty perk and a fit guarantee note to mandatories.',
+        },
+        {
+          role: 'assistant',
+          content: 'Done. Loyalty perk + fit guarantee captured under Mandatories and Offers. Proof points pinned.',
+        },
+        {
+          role: 'assistant',
+          content:
+            'The brief fields are filled with SMP, audiences, tone, mandatories, offers, and proof points. Ready to sync into the matrix and production.',
+        },
+        {
+          role: 'assistant',
+          content: 'Exporting the brief as TXT for demo. You can also tap PDF or JSON in the header to see other formats.',
+        },
+      ]);
+      // Demonstrate export in demo mode without calling backend
+      downloadExport('txt');
+      setLoading(false);
+    }, 850);
   }
 
   function addCustomMatrixField() {
@@ -2895,12 +3002,21 @@ export default function Home() {
                       <span className="text-[11px] text-slate-400">
                         Content matrix + concepts available in final plan (coming soon).
                       </span>
-                      <button
-                        disabled
-                        className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-400 cursor-not-allowed"
-                      >
-                        Load into agent (future)
-                      </button>
+                      {demoMode ? (
+                        <button
+                          onClick={() => loadHistoricalBrief(brief)}
+                          className="text-[11px] px-3 py-1.5 rounded-full border border-teal-500 text-teal-700 bg-teal-50 hover:bg-teal-100"
+                        >
+                          Load into brief
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="text-[11px] px-3 py-1.5 rounded-full border border-slate-200 text-slate-400 cursor-not-allowed"
+                        >
+                          Load (demo only)
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
