@@ -204,6 +204,24 @@ type ProductionJobRow = {
   production_details?: string;
 };
 
+type BuildDetails = {
+  copy_tone?: string;
+  copy_length?: string;
+  copy_cta?: string;
+  image_composition?: string;
+  image_treatments?: string;
+  image_alt?: string;
+  h5_frame_1?: string;
+  h5_frame_2?: string;
+  h5_frame_3?: string;
+  h5_interactions?: string;
+  video_duration?: string;
+  video_shotlist?: string;
+  video_voiceover?: string;
+  audio_script?: string;
+  audio_sfx?: string;
+};
+
 type ProductionMatrixLine = {
   id: string;
   segment_source?: string;
@@ -1045,6 +1063,7 @@ export default function Home() {
       text: string;
     }[];
   }>({});
+  const [jobBuildDetails, setJobBuildDetails] = useState<{ [jobId: string]: BuildDetails }>({});
   const [audienceImportOpen, setAudienceImportOpen] = useState(false);
   const [audienceImportColumns, setAudienceImportColumns] = useState<string[]>([]);
   const [audienceImportRows, setAudienceImportRows] = useState<any[]>([]);
@@ -1995,6 +2014,28 @@ export default function Home() {
     setProductionMatrixRows((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const inferAssetType = (spec?: Spec | null, destinations: DestinationEntry[] = []): string => {
+    const media = (spec?.media_type || '').toLowerCase();
+    const placement = (spec?.placement || '').toLowerCase();
+    const format = (spec as any)?.format_name ? String((spec as any).format_name).toLowerCase() : '';
+    const destStrings = destinations.map((d) => `${d.name || ''} ${d.spec_id || ''}`.toLowerCase()).join(' ');
+
+    const isAudio = media.includes('audio') || placement.includes('audio') || destStrings.includes('audio') || destStrings.includes('podcast');
+    if (isAudio) return 'audio';
+
+    const isH5 = media.includes('html') || media.includes('h5') || placement.includes('html') || placement.includes('h5') || format.includes('html');
+    if (isH5) return 'h5';
+
+    const isVideo =
+      media.includes('video') || placement.includes('video') || format.includes('video') || placement.includes('reel') || placement.includes('story');
+    if (isVideo) return 'video';
+
+    const isCopy = media.includes('copy') || media.includes('text') || format.includes('copy') || placement.includes('copy');
+    if (isCopy) return 'copy';
+
+    return 'image';
+  };
+
   const updateJobFeedMeta = (
     jobId: string,
     field: 'feed_template' | 'template_id' | 'feed_id' | 'feed_asset_id' | 'production_details',
@@ -2051,6 +2092,16 @@ export default function Home() {
     setJobCopyFields((prev) => ({
       ...prev,
       [jobId]: (prev[jobId] || []).filter((c) => c.id !== copyId),
+    }));
+  };
+
+  const updateBuildDetail = (jobId: string, field: keyof BuildDetails, value: string) => {
+    setJobBuildDetails((prev) => ({
+      ...prev,
+      [jobId]: {
+        ...(prev[jobId] || {}),
+        [field]: value,
+      },
     }));
   };
 
@@ -2173,10 +2224,12 @@ export default function Home() {
             production_details: row.production_details || '',
           };
 
+          const inferredAssetType = inferAssetType(spec, dests);
+
           jobs.push({
             job_id: jobId,
             creative_concept: conceptLabel,
-            asset_type: spec?.media_type || 'asset',
+            asset_type: inferredAssetType,
             destinations: jobDestinations,
             technical_summary: `${specLabel}${metaSuffix}`,
             status: 'Pending',
@@ -4139,6 +4192,9 @@ export default function Home() {
                                     const copyBlocks = jobCopyFields[job.job_id] || [];
                                     const meta = jobFeedMeta[job.job_id] || {};
                                     const isFeed = job.is_feed;
+                                    const specMissing =
+                                      (job.technical_summary || '').toLowerCase().includes('spec not set') ||
+                                      job.asset_type === 'asset';
                                     return (
                                       <tr key={job.job_id} className="border-b border-slate-100 align-top">
                                         <td className="py-1.5 pr-4">
@@ -4173,6 +4229,11 @@ export default function Home() {
                                         <td className="py-1.5 pr-4 text-slate-700">
                                           {isFeed ? (
                                             <div className="space-y-1.5">
+                                              {specMissing && (
+                                                <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                  Spec missing – assign a spec to generate build details for this asset type.
+                                                </p>
+                                              )}
                                               <div className="flex gap-2">
                                                 <input
                                                   className="w-1/2 border border-slate-300 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
@@ -4225,6 +4286,11 @@ export default function Home() {
                                         </td>
                                         <td className="py-1.5 pr-4 text-slate-700">
                                           <div className="space-y-2">
+                                            {specMissing && (
+                                              <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                Spec missing – set a spec to tailor build details and requirements.
+                                              </p>
+                                            )}
                                             <textarea
                                               className="w-full min-w-[220px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                                               rows={3}
@@ -4380,6 +4446,9 @@ export default function Home() {
                               const copyBlocks = jobCopyFields[job.job_id] || [];
                               const meta = jobFeedMeta[job.job_id] || {};
                               const status = job.status || 'Pending';
+                              const specMissing =
+                                (job.technical_summary || '').toLowerCase().includes('spec not set') ||
+                                job.asset_type === 'asset';
                               const humanStatus =
                                 status === 'In_Progress' ? 'In Progress' : status === 'Review' ? 'In Review' : status;
                               const progressColor =
@@ -4411,6 +4480,11 @@ export default function Home() {
                                       </span>
                                     </div>
                                     <p className="text-[11px] text-slate-700">{job.technical_summary}</p>
+                                    {specMissing && (
+                                      <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                        Spec missing – add a spec to unlock tailored build details and requirements.
+                                      </p>
+                                    )}
                                     <div className="flex flex-wrap gap-1">
                                       {job.destinations.map((dest) => (
                                         <span
