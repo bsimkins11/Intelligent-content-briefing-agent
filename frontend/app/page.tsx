@@ -214,6 +214,10 @@ type ProductionMatrixLine = {
   notes: string;
   is_feed: boolean;
   production_details?: string;
+  feed_template?: string;
+  template_id?: string;
+  feed_id?: string;
+  feed_asset_id?: string;
 };
 
 // Feed Builder (Asset Feed) row type mirrors the Master Feed Variable Set
