@@ -1543,9 +1543,9 @@ export default function Home() {
       }
       const text = lines.join('\n') + '\n';
       const mime =
-        format === 'json'
+        (format as string) === 'json'
           ? 'application/json'
-          : format === 'pdf'
+          : (format as string) === 'pdf'
           ? 'application/pdf'
           : 'text/plain';
       const blob = new Blob([text], { type: mime });
