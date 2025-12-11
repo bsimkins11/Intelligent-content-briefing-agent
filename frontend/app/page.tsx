@@ -4302,6 +4302,9 @@ export default function Home() {
                                       (job.technical_summary || '').toLowerCase().includes('spec not set') ||
                                       job.asset_type === 'asset';
                                     const missingDestinations = job.missing_destinations || job.destinations.length === 0;
+                                    const requirementFields =
+                                      jobRequirementFields[job.job_id] || getDefaultRequirementFields(job.asset_type);
+                                    const buildDirectionValue = jobBuildDetails[job.job_id]?.build_direction || '';
                                     return (
                                       <tr key={job.job_id} className="border-b border-slate-100 align-top">
                                         <td className="py-1.5 pr-4">
@@ -4355,7 +4358,7 @@ export default function Home() {
                                                 className="w-full border border-slate-300 rounded-md px-2 py-1 text-[11px] resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                                                 rows={3}
                                                 placeholder="Build direction for production team (free form)."
-                                                value={buildDirection}
+                                                value={buildDirectionValue}
                                                 onChange={(e) =>
                                                   updateBuildDetail(job.job_id, 'build_direction' as any, e.target.value)
                                                 }
@@ -4404,7 +4407,7 @@ export default function Home() {
                                                 className="w-full min-w-[200px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
                                                 rows={3}
                                                 placeholder="Build direction for production team (free form)."
-                                                value={buildDirection}
+                                                value={buildDirectionValue}
                                                 onChange={(e) =>
                                                   updateBuildDetail(job.job_id, 'build_direction' as any, e.target.value)
                                                 }
@@ -4629,7 +4632,7 @@ export default function Home() {
                               const missingDestinations = job.missing_destinations || job.destinations.length === 0;
                               const requirementFields =
                                 jobRequirementFields[job.job_id] || getDefaultRequirementFields(job.asset_type);
-                              const buildDirection = jobBuildDetails[job.job_id]?.build_direction || '';
+                              const buildDirectionValue = jobBuildDetails[job.job_id]?.build_direction || '';
                               const humanStatus =
                                 status === 'In_Progress' ? 'In Progress' : status === 'Review' ? 'In Review' : status;
                               const progressColor =
@@ -4745,7 +4748,7 @@ export default function Home() {
                                         </div>
                                       </div>
                                     )}
-                                    {(buildDirection ||
+                                    {(buildDirectionValue ||
                                       meta.production_details ||
                                       meta.feed_template ||
                                       meta.template_id ||
@@ -4756,7 +4759,7 @@ export default function Home() {
                                           Build Details
                                         </p>
                                         <div className="text-[11px] text-slate-700 space-y-0.5">
-                                          {buildDirection && <p>Direction: {buildDirection}</p>}
+                                          {buildDirectionValue && <p>Direction: {buildDirectionValue}</p>}
                                           {meta.production_details && <p>Build: {meta.production_details}</p>}
                                           {meta.feed_template && <p>Feed template: {meta.feed_template}</p>}
                                           {meta.template_id && <p>Template ID: {meta.template_id}</p>}
