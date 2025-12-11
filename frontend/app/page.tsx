@@ -668,6 +668,33 @@ const SAMPLE_MATRIX = [
   { id: "VID-002", audience: "Loyalty", trigger: "Purchase > 30d", content: "Replenish Reminder", format: "9:16 Video" },
 ];
 
+const RUNNING_SHOE_DEMO_BRIEF = {
+  campaignName: 'Velocity Run System Launch',
+  smp: 'Prove faster splits come from lighter shoes and smarter training prompts.',
+  primaryAudience:
+    'Run club loyalists and returning racers logging >30 miles/week who want proof they can PR again.',
+  narrative: `CAMPAIGN: Velocity Run System
+--------------------------------------------------
+SINGLE MINDED PROPOSITION:
+"Light, race-ready shoes plus smart cues make you faster on real courses."
+
+PRIMARY AUDIENCE:
+Run club loyalists and returning racers logging >30 miles/week who want proof they can PR again. They watch Strava segments, compare splits, and swap gear advice in group chats.
+
+CREATIVE DIRECTION:
+- Anchor every story in proof: recent race times, split improvements, and athlete validation.
+- Show real runners and coaches in city and trail settings; no sterile studio looks.
+- Keep copy short, verb-led, and confident. Visual cues of speed: cadence, stride, lightness.
+
+PRODUCTION NOTES:
+- 9:16 and 16:9 cutdowns with captions; show outsole close-ups and stability on corners.
+- Use on-screen data overlays sparingly; 1–2 stats per frame.
+- Avoid generic "fitness montage" shots; prioritize race prep moments and post-run recovery.`,
+  audiences: ['Run Club Loyalists', 'New to Running', 'Trail Explorers'],
+  kpis: ['Race shoe revenue lift', 'Fit quiz completions', 'Store visit bookings'],
+  flight: { start: '2024-08-01', end: '2024-09-30' },
+};
+
 const DEMO_SPECS: Spec[] = [
   {
     id: 'DEMO_META_STORY',
@@ -2201,6 +2228,42 @@ export default function Home() {
     }));
   }
 
+  function runDemoBriefSimulation() {
+    if (!demoMode) return;
+    setLoading(true);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: 'Can you draft a running shoe performance brief that ladders into modular content?',
+      },
+      {
+        role: 'assistant',
+        content: 'Drafting a running shoe performance brief with modular content hooks. I will populate the brief form on the right.',
+      },
+    ]);
+
+    setPreviewPlan((prev: any) => ({
+      ...prev,
+      campaign_name: RUNNING_SHOE_DEMO_BRIEF.campaignName,
+      single_minded_proposition: RUNNING_SHOE_DEMO_BRIEF.smp,
+      primary_audience: RUNNING_SHOE_DEMO_BRIEF.primaryAudience,
+      narrative_brief: RUNNING_SHOE_DEMO_BRIEF.narrative,
+    }));
+
+    setBriefState({
+      campaign_name: RUNNING_SHOE_DEMO_BRIEF.campaignName,
+      smp: RUNNING_SHOE_DEMO_BRIEF.smp,
+      audiences: RUNNING_SHOE_DEMO_BRIEF.audiences,
+      kpis: RUNNING_SHOE_DEMO_BRIEF.kpis,
+      flight_dates: RUNNING_SHOE_DEMO_BRIEF.flight,
+      status: 'Draft',
+    });
+
+    setTimeout(() => setLoading(false), 300);
+  }
+
   function addCustomMatrixField() {
     const rawLabel = window.prompt('Name this new column (e.g., Market, Owner, Priority):');
     if (!rawLabel) return;
@@ -2851,13 +2914,24 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Intelligent Content Brief</h2>
             </div>
-            <button
-              type="button"
-              onClick={addCustomBriefField}
-              className="text-[11px] px-3 py-1.5 rounded-full border border-teal-500 text-teal-700 bg-teal-50 hover:bg-teal-100"
-            >
-              + Add brief field
-            </button>
+            <div className="flex items-center gap-2">
+              {demoMode && (
+                <button
+                  type="button"
+                  onClick={runDemoBriefSimulation}
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-amber-400 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                >
+                  Simulate running shoe brief
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={addCustomBriefField}
+                className="text-[11px] px-3 py-1.5 rounded-full border border-teal-500 text-teal-700 bg-teal-50 hover:bg-teal-100"
+              >
+                + Add brief field
+              </button>
+            </div>
           </div>
           <div className="flex-1 p-6 overflow-y-auto bg-slate-50/40 space-y-4">
             <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
