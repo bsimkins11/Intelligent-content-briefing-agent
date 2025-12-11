@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
 import * as XLSX from 'xlsx';
 import Image from 'next/image';
 
@@ -1062,6 +1062,7 @@ export default function Home() {
   );
   const [showFeedFieldConfig, setShowFeedFieldConfig] = useState(false);
   const [feedRows, setFeedRows] = useState<FeedRow[]>([]);
+  const [expandedMatrixRows, setExpandedMatrixRows] = useState<Record<number, boolean>>({});
   const feedEligible = useMemo(
     () => builderJobs.some((j) => j.is_feed) || productionMatrixRows.some((r) => r.is_feed),
     [builderJobs, productionMatrixRows],
@@ -1171,6 +1172,10 @@ export default function Home() {
       setWorkspaceView('production');
     }
   }, [workspaceView, feedEligible]);
+
+  const toggleMatrixRowExpanded = (index: number) => {
+    setExpandedMatrixRows((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
 
   // ---- Feed Builder helpers ----
   const updateFeedCell = (index: number, key: keyof FeedRow, value: string) => {
@@ -3542,6 +3547,7 @@ export default function Home() {
                           <table className="w-full text-xs text-left">
                             <thead className="bg-slate-50 text-slate-500">
                               <tr>
+                                <th className="px-2 py-2 w-8 text-center"></th>
                                 {matrixFields.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
                                   <th key={field.key} className="px-2 py-2">
                                     {field.label}
@@ -3552,27 +3558,61 @@ export default function Home() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {matrixRows.map((row, index) => (
-                                <tr key={index} className="align-top">
-                                  {matrixFields.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
-                                    <td key={field.key} className="px-2 py-1">
-                                      <input
-                                        value={row[field.key] ?? ''}
-                                        onChange={(e) =>
-                                          updateMatrixCell(index, field.key as MatrixFieldKey, e.target.value)
-                                        }
-                                        className="w-full border border-gray-200 rounded px-2 py-2 text-sm leading-5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
-                                      />
+                                <Fragment key={index}>
+                                  <tr className="align-top hover:bg-slate-50/70">
+                                    <td className="px-2 py-1 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleMatrixRowExpanded(index)}
+                                        className="text-[11px] text-slate-500 hover:text-teal-700"
+                                      >
+                                        {expandedMatrixRows[index] ? '−' : '+'}
+                                      </button>
                                     </td>
-                                  ))}
-                                  <td className="px-2 py-1 text-right">
-                                    <button
-                                      onClick={() => removeMatrixRow(index)}
-                                      className="text-[11px] text-slate-400 hover:text-red-500"
-                                    >
-                                      Remove
-                                    </button>
-                                  </td>
-                                </tr>
+                                    {matrixFields.filter((f) => visibleMatrixFields.includes(f.key)).map((field) => (
+                                      <td key={field.key} className="px-2 py-1">
+                                        <input
+                                          value={row[field.key] ?? ''}
+                                          onChange={(e) =>
+                                            updateMatrixCell(index, field.key as MatrixFieldKey, e.target.value)
+                                          }
+                                          className="w-full border border-gray-200 rounded px-2 py-2 text-sm leading-5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                        />
+                                      </td>
+                                    ))}
+                                    <td className="px-2 py-1 text-right">
+                                      <button
+                                        onClick={() => removeMatrixRow(index)}
+                                        className="text-[11px] text-slate-400 hover:text-red-500"
+                                      >
+                                        Remove
+                                      </button>
+                                    </td>
+                                  </tr>
+                                  {expandedMatrixRows[index] && (
+                                    <tr className="bg-slate-50/70">
+                                      <td colSpan={visibleMatrixFields.length + 2} className="px-3 py-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] text-slate-700">
+                                          {matrixFields
+                                            .filter((f) => visibleMatrixFields.includes(f.key))
+                                            .map((field) => (
+                                              <div
+                                                key={`${field.key}-detail-${index}`}
+                                                className="rounded-lg border border-slate-200 bg-white p-2"
+                                              >
+                                                <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1">
+                                                  {field.label}
+                                                </div>
+                                                <div className="text-slate-700 whitespace-pre-wrap min-h-[32px]">
+                                                  {row[field.key] || '—'}
+                                                </div>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
                               ))}
                             </tbody>
                           </table>
