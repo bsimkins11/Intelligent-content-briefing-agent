@@ -1134,7 +1134,6 @@ export default function Home() {
   const [showPlan, setShowPlan] = useState(false);
   const [showJobs, setShowJobs] = useState(false);
   const [showBoard, setShowBoard] = useState(true);
-  const [showProductionModule, setShowProductionModule] = useState(true);
   const [productionMatrixRows, setProductionMatrixRows] = useState<ProductionMatrixLine[]>(
     deriveProductionRowsFromMatrix(INITIAL_STRATEGY_MATRIX_RUNNING_SHOES),
   );
@@ -1143,6 +1142,20 @@ export default function Home() {
     BASE_FEED_FIELDS.map((f) => f.key).filter((key) => key !== 'date_start' && key !== 'date_end'),
   );
   const [showFeedFieldConfig, setShowFeedFieldConfig] = useState(false);
+  const [feedFieldLibrary, setFeedFieldLibrary] = useState<FeedFieldConfig[]>(BASE_FEED_FIELDS);
+  const [feedMappingPlatform, setFeedMappingPlatform] = useState<string>('Meta');
+  const [feedFieldMappings, setFeedFieldMappings] = useState<
+    { id: string; source: string; destination: string; platform: string }[]
+  >([]);
+  const [destinationFieldLibrary, setDestinationFieldLibrary] = useState<string[]>([
+    'title',
+    'body',
+    'cta',
+    'image_url',
+    'video_url',
+    'tracking_code',
+  ]);
+  const [dragSourceField, setDragSourceField] = useState<string | null>(null);
   const [feedRows, setFeedRows] = useState<FeedRow[]>([]);
   const [expandedMatrixRows, setExpandedMatrixRows] = useState<Record<number, boolean>>({});
   const feedEligible = useMemo(
@@ -1161,6 +1174,10 @@ export default function Home() {
     content_matrix: [],
   }); 
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>(INITIAL_STRATEGY_MATRIX_RUNNING_SHOES);
+  const productionMatrixAudienceOptions = useMemo(
+    () => Array.from(new Set(matrixRows.map((r) => r.segment_name).filter(Boolean))),
+    [matrixRows],
+  );
   const [concepts, setConcepts] = useState<Concept[]>([
     {
       id: 'CON-001',
@@ -1246,16 +1263,19 @@ export default function Home() {
   const brandAssetFileInputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const createId = (prefix: string) => {
+    const uuid =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : null;
+    return uuid || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(scrollToBottom, [messages]);
-  useEffect(() => {
-    if (workspaceView === 'feed' && !feedEligible) {
-      setWorkspaceView('production');
-    }
-  }, [workspaceView, feedEligible]);
   useEffect(() => {
     if (workspaceView !== 'concepts' || rightTab !== 'board') {
       setConceptDetail(null);
@@ -1263,26 +1283,25 @@ export default function Home() {
   }, [workspaceView, rightTab]);
 
   useEffect(() => {
-    let changed = false;
     setJobRequirementFields((prev) => {
-      const next = { ...prev };
-      builderJobs.forEach((job) => {
-        if (!next[job.job_id]) {
+      let next: typeof prev | null = null;
+      for (const job of builderJobs) {
+        if (!prev[job.job_id] && !(next && next[job.job_id])) {
+          if (!next) next = { ...prev };
           next[job.job_id] = getDefaultRequirementFields(job.asset_type);
-          changed = true;
         }
-      });
-      return changed ? next : prev;
+      }
+      return next ?? prev;
     });
     setJobBuildDetails((prev) => {
-      const next = { ...prev };
-      builderJobs.forEach((job) => {
-        if (!next[job.job_id]) {
+      let next: typeof prev | null = null;
+      for (const job of builderJobs) {
+        if (!prev[job.job_id] && !(next && next[job.job_id])) {
+          if (!next) next = { ...prev };
           next[job.job_id] = {};
-          changed = true;
         }
-      });
-      return changed ? next : prev;
+      }
+      return next ?? prev;
     });
   }, [builderJobs]);
 
@@ -1310,10 +1329,7 @@ export default function Home() {
     setFeedRows((prev) => [
       ...prev,
       {
-        row_id:
-          typeof crypto !== 'undefined' && 'randomUUID' in crypto && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `ROW-${Date.now()}-${prev.length + 1}`,
+        row_id: createId('ROW'),
         // Identity & Taxonomy – seeded with example structure from the Master Feed spec
         creative_filename: 'ConcreteJungle_Speed_300x250_H5_v1',
         reporting_label: 'Concept: Concrete Jungle | Msg: Speed Focus',
@@ -1437,6 +1453,67 @@ export default function Home() {
         return clone;
       }),
     );
+  };
+
+  const addLibraryFeedField = () => {
+    const rawLabel = window.prompt('Add a feed library field (label):');
+    if (!rawLabel) return;
+    const trimmed = rawLabel.trim();
+    if (!trimmed) return;
+    let baseKey = trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (!baseKey) baseKey = 'custom';
+    const existingKeys = new Set(feedFieldLibrary.map((f) => f.key));
+    let uniqueKey = baseKey;
+    let idx = 1;
+    while (existingKeys.has(uniqueKey)) {
+      uniqueKey = `${baseKey}_${idx}`;
+      idx += 1;
+    }
+    const newField: FeedFieldConfig = { key: uniqueKey, label: trimmed, isCustom: true };
+    setFeedFieldLibrary((prev) => [...prev, newField]);
+  };
+
+  const applyFeedLibrary = () => {
+    setFeedFields(feedFieldLibrary);
+    setVisibleFeedFields(feedFieldLibrary.map((f) => f.key));
+  };
+
+  const deleteFeedMappingRow = (id: string) => {
+    setFeedFieldMappings((prev) => prev.filter((row) => row.id !== id));
+  };
+
+  const addDestinationField = () => {
+    const raw = window.prompt('Add a destination/platform field name:');
+    if (!raw) return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    setDestinationFieldLibrary((prev) =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed],
+    );
+  };
+
+  const handleDropMapping = (destination: string) => {
+    if (!dragSourceField) return;
+    setFeedFieldMappings((prev) => {
+      const platform = feedMappingPlatform || 'Meta';
+      // Remove any existing mapping for this destination+platform
+      const filtered = prev.filter(
+        (m) => !(m.destination === destination && m.platform === platform),
+      );
+      return [
+        ...filtered,
+        {
+          id: createId('MAP'),
+          source: dragSourceField,
+          destination,
+          platform,
+        },
+      ];
+    });
+    setDragSourceField(null);
   };
 
   // Handle drag-to-resize for split view
@@ -3241,11 +3318,8 @@ export default function Home() {
               className={`text-[11px] px-2 py-1 rounded-full ${
                 workspaceView === 'feed'
                   ? 'bg-white text-slate-900 shadow-sm'
-                  : feedEligible
-                  ? 'text-slate-500 hover:text-slate-700'
-                  : 'text-slate-300 cursor-not-allowed'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
-              disabled={!feedEligible}
             >
               Feed
             </button>
@@ -3695,12 +3769,6 @@ export default function Home() {
                   >
                     Requirements Library
                   </button>
-                  <button
-                    onClick={() => setShowProductionModule((prev) => !prev)}
-                    className="text-[11px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
-                  >
-                    {showProductionModule ? 'Collapse Production' : 'Expand Production'}
-                  </button>
                 </div>
               )}
               <button
@@ -3930,29 +3998,7 @@ export default function Home() {
                 </>
               )}
 
-              {workspaceView === 'production' && !showProductionModule && (
-                <div className="space-y-3">
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Production workspace collapsed
-                      </h3>
-                      <p className="text-[11px] text-slate-500">
-                        Expand to access Plan, Jobs Preview, and the Production Board.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowProductionModule(true)}
-                      className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
-                    >
-                      Expand
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {workspaceView === 'production' && showProductionModule && productionTab === 'requirements' && (
+              {workspaceView === 'production' && productionTab === 'requirements' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-4">
                     <div>
@@ -3978,9 +4024,9 @@ export default function Home() {
                     </div>
                   )}
 
-                  {showPlan && (
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
+                    {showPlan && (
+                      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                             Production Requirements Matrix
@@ -4023,9 +4069,6 @@ export default function Home() {
                           </thead>
                           <tbody>
                             {productionMatrixRows.map((row, index) => {
-                              const audienceOptions = Array.from(
-                                new Set(matrixRows.map((r) => r.segment_name).filter(Boolean)),
-                              );
                               const specOptions = specs;
                               return (
                                 <tr key={row.id} className="border-t border-slate-100">
@@ -4046,7 +4089,7 @@ export default function Home() {
                                       list={`audience-options-${index}`}
                                     />
                                     <datalist id={`audience-options-${index}`}>
-                                      {audienceOptions.map((opt) => (
+                                      {productionMatrixAudienceOptions.map((opt) => (
                                         <option key={opt} value={opt} />
                                       ))}
                                     </datalist>
@@ -4282,7 +4325,7 @@ export default function Home() {
                         </button>
                       </div>
                     </div>
-                    {showJobs && (
+                    {showJobs ? (
                       <>
                         {builderError && (
                           <p className="text-[11px] text-red-500">{builderError}</p>
@@ -4598,6 +4641,10 @@ export default function Home() {
                           </div>
                         )}
                       </>
+                    ) : (
+                      <div className="bg-white border border-dashed border-slate-200 rounded-xl p-4 text-[11px] text-slate-500">
+                        Jobs module is collapsed. Expand to edit production jobs.
+                      </div>
                     )}
                   </div>
 
@@ -4612,11 +4659,11 @@ export default function Home() {
                           Kanban view of the production jobs. Each card is a single asset to be built with full spec details.
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowBoard((prev) => !prev)}
-                          className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowBoard((prev) => !prev)}
+                        className="px-3 py-1.5 text-[11px] rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
                         >
                           {showBoard ? 'Hide board' : 'Show board'}
                         </button>
@@ -4983,7 +5030,7 @@ export default function Home() {
                 </div>
               )}
 
-              {workspaceView === 'production' && showProductionModule && productionTab === 'specLibrary' && (
+              {workspaceView === 'production' && productionTab === 'specLibrary' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -5249,7 +5296,7 @@ export default function Home() {
                 </div>
               )}
 
-              {workspaceView === 'production' && showProductionModule && productionTab === 'requirementsLibrary' && (
+              {workspaceView === 'production' && productionTab === 'requirementsLibrary' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -5907,7 +5954,7 @@ export default function Home() {
                 </div>
               )}
 
-              {workspaceView === 'feed' && feedEligible && (
+              {workspaceView === 'feed' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -5920,6 +5967,12 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
+
+                  {!feedEligible && (
+                    <div className="border border-dashed border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-[11px] text-amber-800">
+                      No feed-eligible rows yet. Mark a production row as “Feed?” to enable feed editing, or continue to add feed rows manually below.
+                    </div>
+                  )}
 
                   <section className="flex flex-wrap items-center gap-3">
                     <button
@@ -6012,6 +6065,143 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 bg-white border border-slate-200 rounded-xl p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                            Source fields
+                          </p>
+                          <p className="text-[10px] text-slate-500">Feed fields you’ve defined.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={applyFeedLibrary}
+                          className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                        >
+                          Load library
+                        </button>
+                      </div>
+                      <div className="space-y-1 max-h-56 overflow-auto">
+                        {feedFieldLibrary.map((field) => (
+                          <div
+                            key={field.key as string}
+                            draggable
+                            onDragStart={() => setDragSourceField(field.key as string)}
+                            onClick={() => setDragSourceField(field.key as string)}
+                            className={`text-[11px] px-2 py-1 rounded border ${
+                              dragSourceField === field.key
+                                ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-teal-400'
+                            }`}
+                          >
+                            {field.label}
+                          </div>
+                        ))}
+                        {feedFieldLibrary.length === 0 && (
+                          <p className="text-[11px] text-slate-400">No source fields.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                            Destination fields
+                          </p>
+                          <p className="text-[10px] text-slate-500">Platform fields to map into.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addDestinationField}
+                          className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                        >
+                          + Add destination
+                        </button>
+                      </div>
+                      <div className="space-y-1 max-h-56 overflow-auto">
+                        {destinationFieldLibrary.map((dest) => {
+                          const mapped = feedFieldMappings.find(
+                            (m) => m.destination === dest && m.platform === feedMappingPlatform,
+                          );
+                          return (
+                            <div
+                              key={dest}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={() => handleDropMapping(dest)}
+                              className="text-[11px] px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:border-teal-400 flex items-center justify-between"
+                            >
+                              <span>{dest}</span>
+                              <button
+                                type="button"
+                                className="text-[10px] text-teal-600"
+                                onClick={() => handleDropMapping(dest)}
+                                disabled={!dragSourceField}
+                              >
+                                Map
+                              </button>
+                              {mapped && (
+                                <span className="text-[10px] text-slate-500 ml-2">
+                                  ← {mapped.source}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {destinationFieldLibrary.length === 0 && (
+                          <p className="text-[11px] text-slate-400">No destination fields.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                            Associations ({feedMappingPlatform})
+                          </p>
+                          <p className="text-[10px] text-slate-500">Source → Destination</p>
+                        </div>
+                        <select
+                          className="text-[11px] border border-slate-200 rounded px-2 py-1 bg-white"
+                          value={feedMappingPlatform}
+                          onChange={(e) =>
+                            setFeedMappingPlatform(e.target.value)
+                          }
+                        >
+                          <option value="Meta">Meta</option>
+                          <option value="Google">Google</option>
+                          <option value="TikTok">TikTok</option>
+                          <option value="DV360">DV360</option>
+                          <option value="LinkedIn">LinkedIn</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1 max-h-56 overflow-auto">
+                        {feedFieldMappings.filter((m) => m.platform === feedMappingPlatform).map((m) => (
+                          <div
+                            key={m.id}
+                            className="flex items-center justify-between text-[11px] px-2 py-1 rounded border border-slate-200 bg-slate-50"
+                          >
+                            <span className="text-slate-700">
+                              {m.source} → {m.destination}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => deleteFeedMappingRow(m.id)}
+                              className="text-[10px] text-slate-400 hover:text-red-500"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        {feedFieldMappings.filter((m) => m.platform === feedMappingPlatform).length === 0 && (
+                          <p className="text-[11px] text-slate-400">No mappings yet. Drag or click Map to connect.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   <section className="border border-slate-200 rounded-xl bg-white overflow-hidden">
                     <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
