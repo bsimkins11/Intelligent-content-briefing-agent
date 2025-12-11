@@ -1036,6 +1036,15 @@ export default function Home() {
       production_details?: string;
     };
   }>({});
+  const [jobCopyFields, setJobCopyFields] = useState<{
+    [jobId: string]: {
+      id: string;
+      label: string;
+      font: string;
+      instructions: string;
+      text: string;
+    }[];
+  }>({});
   const [audienceImportOpen, setAudienceImportOpen] = useState(false);
   const [audienceImportColumns, setAudienceImportColumns] = useState<string[]>([]);
   const [audienceImportRows, setAudienceImportRows] = useState<any[]>([]);
@@ -1997,6 +2006,44 @@ export default function Home() {
         ...prev[jobId],
         [field]: value,
       },
+    }));
+  };
+
+  const addJobCopyField = (jobId: string) => {
+    const id =
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto && crypto.randomUUID && crypto.randomUUID()) ||
+      `COPY-${Date.now()}`;
+    setJobCopyFields((prev) => ({
+      ...prev,
+      [jobId]: [
+        ...(prev[jobId] || []),
+        {
+          id,
+          label: 'Copy block',
+          font: '',
+          instructions: '',
+          text: '',
+        },
+      ],
+    }));
+  };
+
+  const updateJobCopyField = (
+    jobId: string,
+    copyId: string,
+    field: 'label' | 'font' | 'instructions' | 'text',
+    value: string,
+  ) => {
+    setJobCopyFields((prev) => ({
+      ...prev,
+      [jobId]: (prev[jobId] || []).map((c) => (c.id === copyId ? { ...c, [field]: value } : c)),
+    }));
+  };
+
+  const removeJobCopyField = (jobId: string, copyId: string) => {
+    setJobCopyFields((prev) => ({
+      ...prev,
+      [jobId]: (prev[jobId] || []).filter((c) => c.id !== copyId),
     }));
   };
 
@@ -4082,6 +4129,7 @@ export default function Home() {
                                       new Set(job.destinations.map((d) => d.special_notes).filter(Boolean)),
                                     );
                                     const requirementsValue = jobRequirements[job.job_id] ?? '';
+                                    const copyBlocks = jobCopyFields[job.job_id] || [];
                                     const meta = jobFeedMeta[job.job_id] || {};
                                     const isFeed = job.is_feed;
                                     return (
@@ -4169,22 +4217,95 @@ export default function Home() {
                                           )}
                                         </td>
                                         <td className="py-1.5 pr-4 text-slate-700">
-                                          <textarea
-                                            className="w-full min-w-[220px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
-                                            rows={3}
-                                            placeholder={
-                                              uniqueNotes.length
-                                                ? `Key cautions: ${uniqueNotes.join(' | ')}`
-                                                : 'Capture source asset requirements, editing notes, or handoff details.'
-                                            }
-                                            value={requirementsValue}
-                                            onChange={(e) =>
-                                              setJobRequirements((prev) => ({
-                                                ...prev,
-                                                [job.job_id]: e.target.value,
-                                              }))
-                                            }
-                                          />
+                                          <div className="space-y-2">
+                                            <textarea
+                                              className="w-full min-w-[220px] text-[11px] border border-slate-300 rounded-md px-2 py-1 resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                                              rows={3}
+                                              placeholder={
+                                                uniqueNotes.length
+                                                  ? `Key cautions: ${uniqueNotes.join(' | ')}`
+                                                  : 'Capture source asset requirements, editing notes, or handoff details.'
+                                              }
+                                              value={requirementsValue}
+                                              onChange={(e) =>
+                                                setJobRequirements((prev) => ({
+                                                  ...prev,
+                                                  [job.job_id]: e.target.value,
+                                                }))
+                                              }
+                                            />
+                                            <div className="border border-dashed border-slate-200 rounded-lg bg-slate-50/70 p-2 space-y-2">
+                                              <div className="flex items-center justify-between">
+                                                <div className="text-[11px] text-slate-600 font-semibold uppercase tracking-wide">
+                                                  Copy Blocks
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => addJobCopyField(job.job_id)}
+                                                  className="text-[11px] px-2 py-1 rounded-full border border-teal-400 text-teal-700 bg-white hover:bg-teal-50"
+                                                >
+                                                  + Add copy field
+                                                </button>
+                                              </div>
+                                              {copyBlocks.length === 0 ? (
+                                                <p className="text-[11px] text-slate-500">
+                                                  Add custom-named copy fields with font and usage notes for this job.
+                                                </p>
+                                              ) : (
+                                                <div className="space-y-2">
+                                                  {copyBlocks.map((copy) => (
+                                                    <div
+                                                      key={copy.id}
+                                                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-2 shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+                                                    >
+                                                      <div className="flex items-center gap-2">
+                                                        <input
+                                                          className="flex-1 border border-slate-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-500/50 focus:border-teal-500"
+                                                          placeholder="Copy field name (e.g., Hook, CTA, Body)"
+                                                          value={copy.label}
+                                                          onChange={(e) =>
+                                                            updateJobCopyField(job.job_id, copy.id, 'label', e.target.value)
+                                                          }
+                                                        />
+                                                        <input
+                                                          className="w-40 border border-slate-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-500/50 focus:border-teal-500"
+                                                          placeholder="Font / style"
+                                                          value={copy.font}
+                                                          onChange={(e) =>
+                                                            updateJobCopyField(job.job_id, copy.id, 'font', e.target.value)
+                                                          }
+                                                        />
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => removeJobCopyField(job.job_id, copy.id)}
+                                                          className="text-[10px] text-slate-400 hover:text-red-500"
+                                                        >
+                                                          Remove
+                                                        </button>
+                                                      </div>
+                                                      <textarea
+                                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                                        rows={2}
+                                                        placeholder="Copy text or direction (paste final copy or instructions)."
+                                                        value={copy.text}
+                                                        onChange={(e) =>
+                                                          updateJobCopyField(job.job_id, copy.id, 'text', e.target.value)
+                                                        }
+                                                      />
+                                                      <input
+                                                        className="w-full border border-slate-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-500/40 focus:border-teal-500"
+                                                        placeholder="Instructions for this copy (tone, length, placement)."
+                                                        value={copy.instructions}
+                                                        onChange={(e) =>
+                                                          updateJobCopyField(job.job_id, copy.id, 'instructions', e.target.value)
+                                                        }
+                                                      />
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
                                         </td>
                                         <td className="py-1.5 pr-4 text-slate-500 text-[11px]">
                                           {job.status}
@@ -5548,7 +5669,7 @@ export default function Home() {
           onClick={() => setConceptDetail(null)}
         >
           <div
-            className="w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-[90vw] md:w-[80vw] lg:w-[75vw] max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
@@ -5582,7 +5703,7 @@ export default function Home() {
                 </svg>
               </button>
             </div>
-            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
                 {conceptDetail.file_url ? (
                   conceptDetail.file_type?.startsWith('image') ? (
