@@ -1143,6 +1143,35 @@ export default function Home() {
   );
   const [showFeedFieldConfig, setShowFeedFieldConfig] = useState(false);
   const [feedFieldLibrary, setFeedFieldLibrary] = useState<FeedFieldConfig[]>(BASE_FEED_FIELDS);
+  const [feedFieldPartners, setFeedFieldPartners] = useState<Record<string, FeedFieldConfig[]>>({
+    Meta: [
+      { key: 'title', label: 'Title' },
+      { key: 'body', label: 'Body' },
+      { key: 'cta', label: 'CTA' },
+      { key: 'image_url', label: 'Image URL' },
+      { key: 'tracking_code', label: 'Tracking Code' },
+    ],
+    TikTok: [
+      { key: 'primary_text', label: 'Primary Text' },
+      { key: 'cta_text', label: 'CTA Text' },
+      { key: 'video_url', label: 'Video URL' },
+      { key: 'landing_url', label: 'Landing URL' },
+    ],
+    DV360: [
+      { key: 'headline', label: 'Headline' },
+      { key: 'description', label: 'Description' },
+      { key: 'cta_text', label: 'CTA Text' },
+      { key: 'image_url', label: 'Image URL' },
+      { key: 'landing_url', label: 'Landing URL' },
+    ],
+    LinkedIn: [
+      { key: 'intro_text', label: 'Intro Text' },
+      { key: 'headline', label: 'Headline' },
+      { key: 'cta', label: 'CTA' },
+      { key: 'image_url', label: 'Image URL' },
+      { key: 'destination_url', label: 'Destination URL' },
+    ],
+  });
   const [feedMappingPlatform, setFeedMappingPlatform] = useState<string>('Meta');
   const [feedFieldMappings, setFeedFieldMappings] = useState<
     { id: string; source: string; destination: string; platform: string }[]
@@ -1539,6 +1568,38 @@ export default function Home() {
         feed_asset_id: prev[jobId]?.feed_asset_id || '',
         production_details: prev[jobId]?.production_details || '',
       },
+    }));
+  };
+
+  const applyPartnerFields = (partner: string) => {
+    const fields = feedFieldPartners[partner];
+    if (!fields) return;
+    setFeedFields(fields);
+    setVisibleFeedFields(fields.map((f) => f.key));
+    setFeedFieldLibrary(fields);
+  };
+
+  const addPartnerTemplate = () => {
+    const name = window.prompt('Partner name:');
+    if (!name) return;
+    const rawFields = window.prompt('Comma-separated field labels (e.g., Headline, Body, CTA):');
+    if (!rawFields) return;
+    const labels = rawFields
+      .split(',')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!labels.length) return;
+    const newFields: FeedFieldConfig[] = labels.map((label, idx) => {
+      let key = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      if (!key) key = `custom_${idx}`;
+      return { key, label, isCustom: true };
+    });
+    setFeedFieldPartners((prev) => ({
+      ...prev,
+      [name]: newFields,
     }));
   };
 
@@ -6098,6 +6159,53 @@ export default function Home() {
                             </div>
                           );
                         })}
+                      </div>
+                      <div className="mt-3 border border-slate-200 rounded-lg bg-white p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                              Partner Templates
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              Select a partner preset to load its fields into Feed Fields.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={addPartnerTemplate}
+                            className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                          >
+                            + Add partner
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-auto">
+                          {Object.entries(feedFieldPartners).map(([partner, fields]) => (
+                            <button
+                              key={partner}
+                              type="button"
+                              onClick={() => applyPartnerFields(partner)}
+                              className="text-left border border-slate-200 rounded-lg p-2 bg-slate-50 hover:border-teal-400 hover:bg-teal-50"
+                            >
+                              <p className="text-[11px] font-semibold text-slate-700">{partner}</p>
+                              <p className="text-[10px] text-slate-500">{fields.length} field(s)</p>
+                            </button>
+                          ))}
+                          {Object.keys(feedFieldPartners).length === 0 && (
+                            <p className="text-[11px] text-slate-400">No partner templates yet.</p>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-slate-500">
+                            Need all saved fields? Apply feed library directly.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={applyFeedLibrary}
+                            className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                          >
+                            Load feed library
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
