@@ -1147,6 +1147,15 @@ export default function Home() {
   const [feedFieldMappings, setFeedFieldMappings] = useState<
     { id: string; source: string; destination: string; platform: string }[]
   >([]);
+  const DESTINATION_TEMPLATES: Record<string, string[]> = {
+    Meta: ['title', 'body', 'cta', 'image_url', 'video_url', 'tracking_code'],
+    GCM: ['headline', 'description', 'final_url', 'path1', 'path2', 'utm'],
+    Innovid: ['primary_asset', 'backup_image', 'click_url', 'beacon_url', 'tracking_code'],
+    StoryTeq: ['variant_key', 'copy_slot_a', 'copy_slot_b', 'asset_url', 'cta_text'],
+    TikTok: ['primary_text', 'cta', 'video_url', 'landing_url', 'tracking_code'],
+    DV360: ['headline', 'description', 'cta', 'image_url', 'landing_url'],
+    LinkedIn: ['intro_text', 'headline', 'cta', 'image_url', 'destination_url'],
+  };
   const [destinationFieldLibrary, setDestinationFieldLibrary] = useState<string[]>([
     'title',
     'body',
@@ -1157,6 +1166,7 @@ export default function Home() {
   ]);
   const [dragSourceField, setDragSourceField] = useState<string | null>(null);
   const [showFeedMapping, setShowFeedMapping] = useState(true);
+  const [showFeedSourceFields, setShowFeedSourceFields] = useState(true);
   const [feedRows, setFeedRows] = useState<FeedRow[]>([]);
   const [expandedMatrixRows, setExpandedMatrixRows] = useState<Record<number, boolean>>({});
   const feedEligible = useMemo(
@@ -1516,6 +1526,30 @@ export default function Home() {
       ];
     });
     setDragSourceField(null);
+  };
+
+  const updateJobFeedFlag = (jobId: string, value: boolean) => {
+    setBuilderJobs((prev) => prev.map((job) => (job.job_id === jobId ? { ...job, is_feed: value } : job)));
+    setJobFeedMeta((prev) => ({
+      ...prev,
+      [jobId]: {
+        feed_template: prev[jobId]?.feed_template || '',
+        template_id: prev[jobId]?.template_id || '',
+        feed_id: prev[jobId]?.feed_id || '',
+        feed_asset_id: prev[jobId]?.feed_asset_id || '',
+        production_details: prev[jobId]?.production_details || '',
+      },
+    }));
+  };
+
+  const applyDestinationTemplate = (template: string) => {
+    const fields = DESTINATION_TEMPLATES[template];
+    if (!fields || !fields.length) return;
+    setDestinationFieldLibrary((prev) => {
+      const set = new Set(prev);
+      fields.forEach((f) => set.add(f));
+      return Array.from(set);
+    });
   };
 
   // Handle drag-to-resize for split view
@@ -6103,27 +6137,38 @@ export default function Home() {
                             >
                               Load library
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowFeedSourceFields((prev) => !prev)}
+                              className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                            >
+                              {showFeedSourceFields ? 'Hide' : 'Show'}
+                            </button>
                           </div>
-                          <div className="space-y-1 max-h-56 overflow-auto">
-                            {feedFieldLibrary.map((field) => (
-                              <div
-                                key={field.key as string}
-                                draggable
-                                onDragStart={() => setDragSourceField(field.key as string)}
-                                onClick={() => setDragSourceField(field.key as string)}
-                                className={`text-[11px] px-2 py-1 rounded border ${
-                                  dragSourceField === field.key
-                                    ? 'border-teal-500 bg-teal-50 text-teal-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-teal-400'
-                                }`}
-                              >
-                                {field.label}
-                              </div>
-                            ))}
-                            {feedFieldLibrary.length === 0 && (
-                              <p className="text-[11px] text-slate-400">No source fields.</p>
-                            )}
-                          </div>
+                          {showFeedSourceFields ? (
+                            <div className="space-y-1 max-h-56 overflow-auto">
+                              {feedFieldLibrary.map((field) => (
+                                <div
+                                  key={field.key as string}
+                                  draggable
+                                  onDragStart={() => setDragSourceField(field.key as string)}
+                                  onClick={() => setDragSourceField(field.key as string)}
+                                  className={`text-[11px] px-2 py-1 rounded border ${
+                                    dragSourceField === field.key
+                                      ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-teal-400'
+                                  }`}
+                                >
+                                  {field.label}
+                                </div>
+                              ))}
+                              {feedFieldLibrary.length === 0 && (
+                                <p className="text-[11px] text-slate-400">No source fields.</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-500">Source fields hidden.</p>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -6134,13 +6179,29 @@ export default function Home() {
                               </p>
                               <p className="text-[10px] text-slate-500">Platform fields to map into.</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={addDestinationField}
-                              className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
-                            >
-                              + Add destination
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <select
+                                className="text-[10px] border border-slate-200 rounded px-2 py-1 bg-white"
+                                onChange={(e) => applyDestinationTemplate(e.target.value)}
+                                defaultValue=""
+                              >
+                                <option value="" disabled>
+                                  Load template…
+                                </option>
+                                {Object.keys(DESTINATION_TEMPLATES).map((tpl) => (
+                                  <option key={tpl} value={tpl}>
+                                    {tpl}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={addDestinationField}
+                                className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                              >
+                                + Add destination
+                              </button>
+                            </div>
                           </div>
                           <div className="space-y-1 max-h-56 overflow-auto">
                             {destinationFieldLibrary.map((dest) => {
