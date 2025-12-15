@@ -1763,7 +1763,8 @@ export default function Home() {
           return acc;
         }, { ...briefState } as Record<string, any>);
 
-        const res = await fetch('/api/brief', {
+        const briefChatUrl = API_BASE_URL ? `${API_BASE_URL}/brief/chat` : '/brief/chat';
+        const res = await fetch(briefChatUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -1774,7 +1775,13 @@ export default function Home() {
         });
         const data = await res.json().catch(() => ({} as any));
         if (!res.ok) {
-          const serverError = typeof data?.error === 'string' ? data.error : JSON.stringify(data);
+          // FastAPI errors are typically { detail: "..." } while our Next proxy used { error: "..." }
+          const serverError =
+            typeof data?.detail === 'string'
+              ? data.detail
+              : typeof data?.error === 'string'
+                ? data.error
+                : JSON.stringify(data);
           throw new Error(serverError || `Brief proxy failed (${res.status})`);
         }
         setMessages([...newHistory, { role: 'assistant', content: data.reply || '' }]);
