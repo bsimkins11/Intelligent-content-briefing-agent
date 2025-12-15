@@ -1149,6 +1149,14 @@ export default function Home() {
   const [briefQualityGaps, setBriefQualityGaps] = useState<string[]>([]);
   const [briefQualityRationale, setBriefQualityRationale] = useState<string>('');
   const [briefQualityAgentLoading, setBriefQualityAgentLoading] = useState(false);
+  const [briefQualityEval, setBriefQualityEval] = useState<{
+    strengths?: string[];
+    risks?: string[];
+    recommendations?: string[];
+    next_questions?: string[];
+    suggested_edits?: { field: string; suggestion: string }[];
+  } | null>(null);
+  const [showQualityDetails, setShowQualityDetails] = useState(false);
   const [specs, setSpecs] = useState<Spec[]>(PRESET_SPECS);
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [specsError, setSpecsError] = useState<string | null>(null);
@@ -2914,10 +2922,20 @@ export default function Home() {
         if (typeof data?.quality_score === 'number') setBriefQualityScore(data.quality_score);
         if (Array.isArray(data?.gaps)) setBriefQualityGaps(data.gaps as string[]);
         if (typeof data?.rationale === 'string') setBriefQualityRationale(data.rationale);
+        setBriefQualityEval({
+          strengths: Array.isArray(data?.strengths) ? (data.strengths as string[]) : undefined,
+          risks: Array.isArray(data?.risks) ? (data.risks as string[]) : undefined,
+          recommendations: Array.isArray(data?.recommendations) ? (data.recommendations as string[]) : undefined,
+          next_questions: Array.isArray(data?.next_questions) ? (data.next_questions as string[]) : undefined,
+          suggested_edits: Array.isArray(data?.suggested_edits)
+            ? (data.suggested_edits as { field: string; suggestion: string }[])
+            : undefined,
+        });
       } catch (e: any) {
         // Don't spam the UI; keep last known values and surface a small hint.
         const msg = e?.message ? String(e.message) : String(e);
         setBriefQualityRationale(msg ? `Scoring agent unavailable: ${msg}` : '');
+        setBriefQualityEval(null);
       } finally {
         setBriefQualityAgentLoading(false);
       }
@@ -4006,6 +4024,76 @@ export default function Home() {
                   <span className="truncate">
                     {briefQualityAgentLoading ? 'Scoring…' : briefQualityRationale}
                   </span>
+                </div>
+              )}
+              {briefQualityEval && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowQualityDetails((v) => !v)}
+                    className="text-[10px] font-semibold text-slate-600 hover:text-teal-700"
+                  >
+                    {showQualityDetails ? 'Hide Quality Assistant details' : 'Show Quality Assistant details'}
+                  </button>
+                  {showQualityDetails && (
+                    <div className="mt-2 text-[11px] text-slate-600 space-y-2">
+                      {briefQualityEval.recommendations?.length ? (
+                        <div>
+                          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                            Recommendations
+                          </div>
+                          <div className="mt-1">
+                            {briefQualityEval.recommendations.slice(0, 4).map((r, idx) => (
+                              <div key={idx} className="leading-relaxed">
+                                - {r}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {briefQualityEval.suggested_edits?.length ? (
+                        <div>
+                          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                            Suggested edits (copy/paste)
+                          </div>
+                          <div className="mt-1 space-y-1">
+                            {briefQualityEval.suggested_edits.slice(0, 4).map((e, idx) => (
+                              <div key={idx} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
+                                <div className="text-[10px] font-mono text-slate-500">{e.field}</div>
+                                <div className="text-[11px] text-slate-700">{e.suggestion}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {briefQualityEval.risks?.length ? (
+                        <div>
+                          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Risks</div>
+                          <div className="mt-1">
+                            {briefQualityEval.risks.slice(0, 4).map((r, idx) => (
+                              <div key={idx} className="leading-relaxed">
+                                - {r}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {briefQualityEval.next_questions?.length ? (
+                        <div>
+                          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                            Next questions
+                          </div>
+                          <div className="mt-1">
+                            {briefQualityEval.next_questions.slice(0, 3).map((q, idx) => (
+                              <div key={idx} className="leading-relaxed">
+                                - {q}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="space-y-3">

@@ -10,6 +10,14 @@ type ScoreResponse = {
   quality_score: number;
   gaps: string[];
   rationale: string;
+  strengths?: string[];
+  risks?: string[];
+  recommendations?: string[];
+  next_questions?: string[];
+  suggested_edits?: {
+    field: string;
+    suggestion: string;
+  }[];
 };
 
 export async function POST(req: NextRequest) {
@@ -38,7 +46,14 @@ Return ONLY valid JSON with this exact shape:
 {
   "quality_score": 0-10 (number, can be decimal),
   "gaps": ["Gap 1", "Gap 2", "Gap 3"], // max 3, most important missing items
-  "rationale": "1-2 sentences explaining the score and what to improve next."
+  "rationale": "1-2 sentences explaining the score and what to improve next.",
+  "strengths": ["..."],              // 2-4 bullets, concrete and specific
+  "risks": ["..."],                  // 2-4 bullets, concrete downstream risks (creative/media/production)
+  "recommendations": ["..."],        // 2-4 bullets, highest leverage fixes
+  "next_questions": ["..."],         // 1-3 questions to ask the user next
+  "suggested_edits": [               // 1-4 targeted field edits; keep short, copy/pasteable
+    { "field": "single_minded_proposition", "suggestion": "..." }
+  ]
 }
 `;
 
