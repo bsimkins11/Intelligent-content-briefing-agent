@@ -12,6 +12,9 @@
   ],
   "routes": [
     {
+      "handle": "filesystem"
+    },
+    {
       "src": "/chat",
       "dest": "/backend/index.py"
     },
@@ -53,7 +56,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "dest": "/"
     }
   ]
 }

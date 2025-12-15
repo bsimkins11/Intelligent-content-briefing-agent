@@ -21,20 +21,19 @@ Keep replies concise sentences. Then ask "Ready for the next field?"
 Do not return JSON in your reply.
 `;
 
-    const messages = [
-      { role: 'system', content: systemPrompt.trim() },
-      ...(Array.isArray(chat_log) ? chat_log : []),
-    ];
+    const messages = Array.isArray(chat_log) ? chat_log : [];
 
     const geminiPayload = {
-      contents: messages.map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: String(m.content || '') }],
-      })),
-      system_instruction: {
-        role: 'system',
+      // v1beta REST expects camelCase: systemInstruction
+      systemInstruction: {
         parts: [{ text: systemPrompt.trim() }],
       },
+      contents: messages
+        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
+        .map((m: any) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: String(m.content || '') }],
+        })),
     };
 
     const response = await fetch(

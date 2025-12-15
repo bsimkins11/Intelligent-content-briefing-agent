@@ -1772,7 +1772,11 @@ export default function Home() {
             chat_log: newHistory,
           }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          const serverError = typeof data?.error === 'string' ? data.error : JSON.stringify(data);
+          throw new Error(serverError || `Brief proxy failed (${res.status})`);
+        }
         setMessages([...newHistory, { role: 'assistant', content: data.reply || '' }]);
         setBriefQualityScore(null);
         setBriefQualityGaps([]);
@@ -1791,13 +1795,16 @@ export default function Home() {
         setMessages([...newHistory, { role: 'assistant', content: data.reply }]);
       }
     } catch (error) {
+      const errMsg = (error as any)?.message ? String((error as any).message) : String(error);
       console.error(error);
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
           content:
-            'I could not reach the briefing agent. Please confirm the API is running (port 8000) and your Gemini key is set. If offline, toggle Demo Mode.',
+            `I could not reach the briefing agent.\n\n` +
+            `Details: ${errMsg}\n\n` +
+            `Please confirm the API is running (port 8000) and your Gemini key is set (GOOGLE_API_KEY). If offline, toggle Demo Mode.`,
         },
       ]);
     }
