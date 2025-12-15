@@ -1,35 +1,18 @@
-import os
 import json
+import os
+import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import TypedDict, List
+from typing import List
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage, AIMessage
-from langgraph.graph import StateGraph, END
 
-# Load environment from backend/.env
+# Load environment from backend/.env (local dev). In Vercel, env vars come from Project Settings.
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=False)
 
 _GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 _MODEL_NAME = os.getenv("GEMINI_MODEL", "models/gemini-2.5-pro")
-_LLM_AVAILABLE = bool(_GOOGLE_API_KEY)
-
-llm = (
-    ChatGoogleGenerativeAI(
-        model=_MODEL_NAME,
-        temperature=0.4,  # balanced: concise but not overly rigid
-        google_api_key=_GOOGLE_API_KEY,
-    )
-    if _LLM_AVAILABLE
-    else None
-)
-
-
-class AgentState(TypedDict):
-    messages: List[BaseMessage]
-    current_plan: dict
 
 
 SYSTEM_PROMPT = """You are an expert Content Strategy Architect and world-class ModCon briefing SME.
@@ -65,62 +48,66 @@ Current Plan State:
 {current_plan}
 """
 
-
-def call_model(state: AgentState):
-    messages = state["messages"]
-    current_plan_str = json.dumps(state.get("current_plan", {}), indent=2)
-    system_msg = SystemMessage(content=SYSTEM_PROMPT.format(current_plan=current_plan_str))
-
-    # Stub mode
+def _gemini_generate(system_prompt: str, chat_log: List[dict]) -> str:
+    """
+    Minimal Gemini REST call (stdlib only) to keep the serverless backend lightweight.
+    """
     if os.getenv("DEMO_AGENT_STUB") == "1":
-        stub_reply = (
+        return (
             "Demo mode: let's lock a solid ModCon brief. Give me campaign name, SMP, primary audience, "
             "KPIs, flight dates, mandatories, tone, offers, proof points, and any brand assets. "
-            "If you share an audience matrix or specs, I'll shape the content matrix next. "
-            "Quality: 3/10. Gaps: missing SMP, audiences, KPIs, mandatories, tone."
+            "If you share an audience matrix or specs, I'll shape the content matrix next."
         )
-        return {"messages": [AIMessage(content=stub_reply)]}
 
-    if not _LLM_AVAILABLE or llm is None:
-        fallback = (
-            "I can't reach Gemini because the API key isn't loaded. Please set GOOGLE_API_KEY and restart the server. "
+    if not _GOOGLE_API_KEY:
+        return (
+            "I can't reach Gemini because the API key isn't loaded. Please set GOOGLE_API_KEY and redeploy. "
             "Share campaign name, SMP, audiences, KPIs, flight dates, mandatories, tone/voice, offers, proof points, "
             "and specs/asset libraries, and I'll draft the brief once connected."
         )
-        return {"messages": [AIMessage(content=fallback)]}
+
+    payload = {
+        "systemInstruction": {"parts": [{"text": system_prompt.strip()}]},
+        "contents": [
+            {
+                "role": ("model" if m.get("role") == "assistant" else "user"),
+                "parts": [{"text": str(m.get("content", "") or "")}],
+            }
+            for m in (chat_log or [])
+            if m and m.get("role") in ("user", "assistant")
+        ],
+    }
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{_MODEL_NAME}:generateContent?key={_GOOGLE_API_KEY}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
 
     try:
-        response = llm.invoke([system_msg] + messages)
-        return {"messages": [response]}
-    except Exception as exc:
-        fallback = (
-            "I hit an issue reaching the model. Let's keep going anyway: share campaign name, SMP, "
-            "primary audience(s), KPIs, flight dates, mandatories, tone/voice, offers, proof points, "
-            "and any specs/asset libraries. I'll draft a ModCon brief and content matrix from that."
-        )
-        return {"messages": [AIMessage(content=f"{fallback} (error: {exc})")]}
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        raise RuntimeError(f"Gemini API error {e.code}: {err_body or e.reason}") from e
+    except Exception as e:
+        raise RuntimeError(f"Gemini request failed: {e}") from e
+
+    try:
+        parsed = json.loads(raw)
+        text = " ".join(
+            (p.get("text") or "")
+            for p in (parsed.get("candidates", [{}])[0].get("content", {}).get("parts", []) or [])
+            if isinstance(p, dict)
+        ).strip()
+        return text or "No reply generated."
+    except Exception:
+        return raw or "No reply generated."
 
 
-def should_continue(state: AgentState):
-    return END
-
-
-workflow = StateGraph(AgentState)
-workflow.add_node("agent", call_model)
-workflow.set_entry_point("agent")
-workflow.add_edge("agent", END)
-app_graph = workflow.compile()
-
-
-async def process_message(history: List[dict], current_plan: dict):
-    lc_messages: List[BaseMessage] = []
-    for msg in history:
-        if msg.get("role") == "user":
-            lc_messages.append(HumanMessage(content=msg.get("content", "")))
-        else:
-            lc_messages.append(AIMessage(content=msg.get("content", "")))
-
-    inputs = {"messages": lc_messages, "current_plan": current_plan}
-    result = await app_graph.ainvoke(inputs)
-    last_msg = result["messages"][-1]
-    return last_msg.content
+async def process_message(history: List[dict], current_plan: dict) -> str:
+    current_plan_str = json.dumps(current_plan or {}, indent=2)
+    system_prompt = SYSTEM_PROMPT.format(current_plan=current_plan_str)
+    return _gemini_generate(system_prompt=system_prompt, chat_log=history or [])

@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Tuple, Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import os
 import re
 
-from app.agent_core import llm
+from app.agent_core import _gemini_generate
 from app.schemas.brief import ModConBrief
 
 
@@ -143,32 +142,19 @@ def update_brief_ai(
     This stays deliberately thin: it lets the model propose an updated brief
     and a conversational reply, then we validate & merge the state.
     """
-    # Stub path when LLM isn't available or demo mode is on
-    if llm is None or os.getenv("DEMO_AGENT_STUB") == "1":
+    system_prompt = SYSTEM_PROMPT.format(current_state=json.dumps(current_state.model_dump(), indent=2))
+
+    # Stub path when demo mode is on (or when Gemini key is missing in serverless)
+    if os.getenv("DEMO_AGENT_STUB") == "1" or not os.getenv("GOOGLE_API_KEY"):
         stub_reply = (
             "Let's tighten your ModCon brief. Please share campaign name, SMP, primary audience(s), KPIs, "
             "flight dates, mandatories, tone/voice, offers, proof points, and any specs/asset libraries. "
-            "I'll draft and score it. Quality: 3/10. Gaps: missing SMP, audiences, KPIs, mandatories, tone."
+            "I'll draft and score it once Gemini is connected."
         )
         return current_state, stub_reply, 3.0
 
-    system = SystemMessage(
-        content=SYSTEM_PROMPT.format(current_state=json.dumps(current_state.model_dump(), indent=2))
-    )
-    messages = [system]
-    for msg in chat_log:
-        role = msg.get("role")
-        content = msg.get("content", "")
-        if not content:
-            continue
-        if role == "user":
-            messages.append(HumanMessage(content=content))
-        else:
-            messages.append(AIMessage(content=content))
-
     try:
-        response = llm.invoke(messages)
-        raw = response.content if isinstance(response, AIMessage) else str(response)
+        raw = _gemini_generate(system_prompt=system_prompt, chat_log=chat_log or [])
     except Exception as exc:
         fallback = (
             "I hit an issue reaching the model. Let's keep going: share campaign name, SMP, audiences, KPIs, "

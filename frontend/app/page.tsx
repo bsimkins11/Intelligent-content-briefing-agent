@@ -1763,7 +1763,8 @@ export default function Home() {
           return acc;
         }, { ...briefState } as Record<string, any>);
 
-        const briefChatUrl = API_BASE_URL ? `${API_BASE_URL}/brief/chat` : '/brief/chat';
+        // Vercel edge sometimes redirects /brief/chat -> /brief/chat/ (308). Use trailing slash to avoid redirect quirks.
+        const briefChatUrl = API_BASE_URL ? `${API_BASE_URL}/brief/chat/` : '/brief/chat/';
         const res = await fetch(briefChatUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1773,7 +1774,14 @@ export default function Home() {
             chat_log: newHistory,
           }),
         });
-        const data = await res.json().catch(() => ({} as any));
+        const rawText = await res.text();
+        const data = (() => {
+          try {
+            return rawText ? JSON.parse(rawText) : ({} as any);
+          } catch {
+            return ({} as any);
+          }
+        })();
         if (!res.ok) {
           // FastAPI errors are typically { detail: "..." } while our Next proxy used { error: "..." }
           const serverError =
@@ -1781,8 +1789,8 @@ export default function Home() {
               ? data.detail
               : typeof data?.error === 'string'
                 ? data.error
-                : JSON.stringify(data);
-          throw new Error(serverError || `Brief proxy failed (${res.status})`);
+                : rawText || JSON.stringify(data);
+          throw new Error(serverError || `Brief request failed (${res.status})`);
         }
         setMessages([...newHistory, { role: 'assistant', content: data.reply || '' }]);
         setBriefQualityScore(null);
