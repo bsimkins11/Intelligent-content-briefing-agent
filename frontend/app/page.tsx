@@ -1142,6 +1142,8 @@ export default function Home() {
   });
   const [briefQualityScore, setBriefQualityScore] = useState<number | null>(null);
   const [briefQualityGaps, setBriefQualityGaps] = useState<string[]>([]);
+  const [briefQualityRationale, setBriefQualityRationale] = useState<string>('');
+  const [briefQualityAgentLoading, setBriefQualityAgentLoading] = useState(false);
   const [specs, setSpecs] = useState<Spec[]>(PRESET_SPECS);
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [specsError, setSpecsError] = useState<string | null>(null);
@@ -1794,9 +1796,7 @@ export default function Home() {
           throw new Error(serverError || `Brief request failed (${res.status})`);
         }
         setMessages([...newHistory, { role: 'assistant', content: data.reply || '' }]);
-        setBriefQualityScore(null);
-        setBriefQualityGaps([]);
-        // We keep state as-is; proxy returns echo of current_state for now.
+        // Quality is computed locally in real-time from the current brief fields.
       } else {
         const res = await fetch(`${API_BASE_URL}/chat`, {
           method: 'POST',
@@ -2817,6 +2817,53 @@ export default function Home() {
     setShowLibrary(false);
   }
 
+  function computeBriefQualityAndGaps(brief: Record<string, any>): { score: number; gaps: string[] } {
+    const clean = (v: any) => (typeof v === 'string' ? v.trim() : '');
+    const list = (v: any) => {
+      if (Array.isArray(v)) {
+        return v.map((x) => String(x ?? '').trim()).filter(Boolean);
+      }
+      if (typeof v === 'string') {
+        return v
+          .split(/[\n,]/g)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      return [];
+    };
+
+    const name = clean(brief.campaign_name);
+    const smp = clean(brief.smp || brief.single_minded_proposition);
+    const audiences = list(brief.audiences);
+    const primaryAudience = clean(brief.primary_audience);
+    const kpis = list(brief.kpis);
+    const narrative = clean(brief.narrative_brief);
+    const flight = brief.flight_dates && typeof brief.flight_dates === "object" ? brief.flight_dates : {};
+    const flightStart = clean((flight as any).start);
+    const flightEnd = clean((flight as any).end);
+
+    let score = 0.0;
+    const gaps: string[] = [];
+
+    if (name) score += 2.0;
+    else gaps.push('Campaign Name');
+
+    if (smp && smp.length >= 12) score += 3.0;
+    else gaps.push('Single Minded Proposition');
+
+    if (audiences.length > 0 || primaryAudience) score += 2.0;
+    else gaps.push('Audiences');
+
+    if (kpis.length > 0) score += 2.0;
+    else gaps.push('KPIs');
+
+    if (flightStart && flightEnd) score += 1.0;
+    if (narrative && narrative.length >= 40) score += 0.5;
+
+    score = Math.min(10.0, score);
+    return { score, gaps: gaps.slice(0, 3) };
+  }
+
   function updateBriefFieldValue(key: BriefFieldKey, value: string) {
     setPreviewPlan((prev: any) => ({
       ...prev,
@@ -2827,6 +2874,55 @@ export default function Home() {
       [key]: value,
     }));
   }
+
+  // Keep Quality score/gaps reactive as the brief fields change (instant feedback as you type).
+  useEffect(() => {
+    const merged = { ...(briefState as any), ...(previewPlan as any) };
+    const { score, gaps } = computeBriefQualityAndGaps(merged);
+
+    setBriefQualityScore((prev) => (prev === score ? prev : score));
+    setBriefQualityGaps((prev) => (prev.join('|') === gaps.join('|') ? prev : gaps));
+  }, [briefState, previewPlan]);
+
+  // ECD-quality scoring agent (debounced) — runs only when not in demo mode.
+  useEffect(() => {
+    if (demoMode) return;
+    if (workspaceView !== 'brief') return;
+
+    const merged = { ...(briefState as any), ...(previewPlan as any) };
+    const controller = new AbortController();
+    const t = window.setTimeout(async () => {
+      try {
+        setBriefQualityAgentLoading(true);
+        const res = await fetch('/brief/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({ current_state: merged }),
+        });
+        const rawText = await res.text();
+        const data = rawText ? JSON.parse(rawText) : {};
+        if (!res.ok) {
+          const err = typeof data?.detail === 'string' ? data.detail : rawText;
+          throw new Error(err || `Score request failed (${res.status})`);
+        }
+        if (typeof data?.quality_score === 'number') setBriefQualityScore(data.quality_score);
+        if (Array.isArray(data?.gaps)) setBriefQualityGaps(data.gaps as string[]);
+        if (typeof data?.rationale === 'string') setBriefQualityRationale(data.rationale);
+      } catch (e: any) {
+        // Don't spam the UI; keep last known values and surface a small hint.
+        const msg = e?.message ? String(e.message) : String(e);
+        setBriefQualityRationale(msg ? `Scoring agent unavailable: ${msg}` : '');
+      } finally {
+        setBriefQualityAgentLoading(false);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(t);
+      controller.abort();
+    };
+  }, [demoMode, workspaceView, briefState, previewPlan]);
 
   function runDemoBriefSimulation() {
     if (!demoMode) return;
@@ -3894,6 +3990,14 @@ export default function Home() {
                   )}
                 </div>
               </div>
+              {(briefQualityAgentLoading || briefQualityRationale) && (
+                <div className="mt-2 text-[10px] text-slate-500">
+                  <span className="font-semibold text-slate-600">ECD score:</span>{' '}
+                  <span className="truncate">
+                    {briefQualityAgentLoading ? 'Scoring…' : briefQualityRationale}
+                  </span>
+                </div>
+              )}
               <div className="space-y-3">
                 {briefFields.map((field) => {
                   const value = (previewPlan && (previewPlan as any)[field.key]) ?? '';
