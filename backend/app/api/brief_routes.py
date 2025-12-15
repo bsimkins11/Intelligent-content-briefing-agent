@@ -22,6 +22,7 @@ class BriefChatRequest(BaseModel):
 
 class BriefChatResponse(BaseModel):
     reply: str
+    quality_score: float | None = None
     state: ModConBrief
 
 
@@ -37,10 +38,10 @@ class BriefUpdateResponse(BaseModel):
 @router.post("/chat", response_model=BriefChatResponse)
 async def brief_chat(request: BriefChatRequest) -> BriefChatResponse:
     try:
-        new_state, reply = update_brief_ai(
+        new_state, reply, quality_score = update_brief_ai(
             current_state=request.current_state, chat_log=[m.dict() for m in request.chat_log]
         )
-        return BriefChatResponse(reply=reply, state=new_state)
+        return BriefChatResponse(reply=reply, state=new_state, quality_score=quality_score)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -54,5 +55,4 @@ async def brief_update(request: BriefUpdateRequest) -> BriefUpdateResponse:
         return BriefUpdateResponse(state=new_state)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 

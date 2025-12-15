@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class BriefStatus(str, Enum):
@@ -24,5 +24,6 @@ class ModConBrief(BaseModel):
     kpis: List[str] = []
     flight_dates: Dict[str, str] = {}
     status: BriefStatus = BriefStatus.DRAFT
-
+    # Permit arbitrary extra fields so users can add/remove fields dynamically
+    model_config = ConfigDict(extra="allow")
 

@@ -35,6 +35,18 @@ app.include_router(concept_router, prefix="/concepts", tags=["concepts"])
 app.include_router(spec_router, prefix="/specs", tags=["specs"])
 app.include_router(production_router, prefix="/production", tags=["production"])
 
+
+@app.get("/")
+async def root():
+  """
+  Lightweight root so hitting the base URL doesn't return 404.
+  """
+  return {
+    "service": "Intelligent Briefing Agent",
+    "status": "ok",
+    "endpoints": ["/docs", "/chat", "/brief/chat", "/matrix", "/concepts", "/specs", "/production"],
+  }
+
 class ChatMessage(BaseModel):
     role: str
     content: str

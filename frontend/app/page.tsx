@@ -136,6 +136,8 @@ type ModConBriefState = {
   kpis: string[];
   flight_dates: Record<string, string>;
   status: 'Draft' | 'Approved';
+  // Allow dynamic brief fields added by the user or agent
+  [key: string]: any;
 };
 
 type Spec = {
@@ -1110,13 +1112,15 @@ export default function Home() {
   const [matrixLibrary, setMatrixLibrary] = useState<ContentMatrixTemplate[]>(INITIAL_MATRIX_LIBRARY);
   const [briefFields, setBriefFields] = useState<BriefFieldConfig[]>(BASE_BRIEF_FIELDS);
   const [briefState, setBriefState] = useState<ModConBriefState>({
-    campaign_name: 'Intelligent Content System – Demo Campaign',
+    campaign_name: '',
     smp: '',
     audiences: [],
     kpis: [],
     flight_dates: {},
     status: 'Draft',
   });
+  const [briefQualityScore, setBriefQualityScore] = useState<number | null>(null);
+  const [briefQualityGaps, setBriefQualityGaps] = useState<string[]>([]);
   const [specs, setSpecs] = useState<Spec[]>(PRESET_SPECS);
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [specsError, setSpecsError] = useState<string | null>(null);
@@ -1252,12 +1256,10 @@ export default function Home() {
 
   // This would eventually be live-updated from the backend
   const [previewPlan, setPreviewPlan] = useState<any>({
-    campaign_name: 'Intelligent Content System – Demo Campaign',
-    single_minded_proposition: 'Show how a single modular content system can serve multiple audiences and channels.',
-    primary_audience: 'Marketing and creative leaders evaluating intelligent content and modular storytelling.',
-    narrative_brief:
-      'Use this brief to define the story, audiences, and guardrails for an intelligent content system. ' +
-      'Capture objectives, constraints, and how modular assets should recombine across channels.',
+    campaign_name: '',
+    single_minded_proposition: '',
+    primary_audience: '',
+    narrative_brief: '',
     content_matrix: [],
   }); 
   const [matrixRows, setMatrixRows] = useState<MatrixRow[]>(INITIAL_STRATEGY_MATRIX_RUNNING_SHOES);
@@ -1711,6 +1713,8 @@ export default function Home() {
     setMessages(newHistory);
     setInput('');
     setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
 
     // In demo mode, simulate the agent locally without calling the backend
     if (demoMode) {
@@ -1731,25 +1735,45 @@ export default function Home() {
 
     try {
       if (workspaceView === 'brief') {
+        // Build a dynamic brief payload that mirrors the visible brief fields (including custom ones)
+        const briefPayload = briefFields.reduce((acc, field) => {
+          const value = (previewPlan && (previewPlan as any)[field.key]) ?? (briefState as any)[field.key] ?? '';
+          acc[field.key] = value;
+          return acc;
+        }, { ...briefState } as Record<string, any>);
+
         const res = await fetch(`${API_BASE_URL}/brief/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
-            current_state: briefState,
+            current_state: briefPayload,
             chat_log: newHistory,
           }),
         });
         const data = await res.json();
-        setMessages([...newHistory, { role: 'assistant', content: data.reply }]);
+        setMessages([...newHistory, { role: 'assistant', content: data.reply || '' }]);
+        if (typeof data.quality_score === 'number') {
+          setBriefQualityScore(data.quality_score);
+        }
+        if (Array.isArray(data.state?.gaps)) {
+          setBriefQualityGaps(data.state.gaps as string[]);
+        } else if (Array.isArray(data.gaps)) {
+          setBriefQualityGaps(data.gaps as string[]);
+        } else {
+          setBriefQualityGaps([]);
+        }
         if (data.state) {
           const nextBrief = data.state as ModConBriefState;
           setBriefState(nextBrief);
           setPreviewPlan((prev: any) => ({
             ...prev,
+            ...nextBrief,
             campaign_name: nextBrief.campaign_name || prev.campaign_name,
-            single_minded_proposition: nextBrief.smp || prev.single_minded_proposition,
+            single_minded_proposition: (nextBrief as any).single_minded_proposition || nextBrief.smp || prev.single_minded_proposition,
             primary_audience:
               (Array.isArray(nextBrief.audiences) && nextBrief.audiences.join(', ')) ||
+              (nextBrief as any).primary_audience ||
               prev.primary_audience,
           }));
         }
@@ -1757,6 +1781,7 @@ export default function Home() {
         const res = await fetch(`${API_BASE_URL}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             history: newHistory,
             current_plan: previewPlan,
@@ -1767,7 +1792,16 @@ export default function Home() {
       }
     } catch (error) {
       console.error(error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'I could not reach the briefing agent. Please confirm the API is running (port 8000) and your Gemini key is set. If offline, toggle Demo Mode.',
+        },
+      ]);
     }
+    clearTimeout(timeoutId);
     setLoading(false);
   };
 
@@ -2697,14 +2731,26 @@ export default function Home() {
       ...prev,
       [key]: '',
     }));
+    setBriefState((prev) => ({
+      ...prev,
+      [key]: '',
+    }));
   }
 
   function deleteCustomBriefField(key: BriefFieldKey) {
-    setBriefFields((prev) => prev.filter((f) => !(f.key === key && f.isCustom)));
+    const confirmDelete = window.confirm('Remove this brief field?');
+    if (!confirmDelete) return;
+
+    setBriefFields((prev) => prev.filter((f) => f.key !== key));
     setPreviewPlan((prev: any) => {
       if (!prev) return prev;
       const { [key]: _removed, ...rest } = prev;
       return rest;
+    });
+    setBriefState((prev) => {
+      const next = { ...prev };
+      delete (next as any)[key];
+      return next;
     });
   }
 
@@ -2724,6 +2770,15 @@ export default function Home() {
       flight_dates: {},
       status: 'Draft',
     });
+    setBriefState((prev) => ({
+      ...prev,
+      campaign_name: brief.campaign_name,
+      smp: brief.single_minded_proposition,
+      audiences: [brief.primary_audience],
+      kpis: [],
+      flight_dates: {},
+      status: 'Draft',
+    }));
     setMessages((prev) => [
       ...prev,
       {
@@ -2741,6 +2796,10 @@ export default function Home() {
 
   function updateBriefFieldValue(key: BriefFieldKey, value: string) {
     setPreviewPlan((prev: any) => ({
+      ...prev,
+      [key]: value,
+    }));
+    setBriefState((prev) => ({
       ...prev,
       [key]: value,
     }));
@@ -2801,14 +2860,20 @@ export default function Home() {
       proof_points: 'Recent PR improvements (+12s/mi avg), athlete quotes, lab-tested cushioning data.',
     }));
 
-    setBriefState({
+    setBriefState((prev) => ({
+      ...prev,
       campaign_name: RUNNING_SHOE_DEMO_BRIEF.campaignName,
       smp: RUNNING_SHOE_DEMO_BRIEF.smp,
       audiences: RUNNING_SHOE_DEMO_BRIEF.audiences,
       kpis: RUNNING_SHOE_DEMO_BRIEF.kpis,
       flight_dates: RUNNING_SHOE_DEMO_BRIEF.flight,
       status: 'Draft',
-    });
+      audience_subsegments: '- Run Club Loyalists (30+ mi/week)\n- Trail Explorers (technical terrain)\n- New-to-running 5k starters',
+      mandatories: '- Show outsole/stability close-ups\n- Include captions for sound-off\n- Avoid medical claims; highlight fit guarantee',
+      tone_voice: 'Confident, proof-first, no hype; coach-like clarity with short verbs.',
+      offers: 'Race-day bundle offer; Fit Quiz CTA for new runners; Loyalty perk for repeat buyers.',
+      proof_points: 'Recent PR improvements (+12s/mi avg), athlete quotes, lab-tested cushioning data.',
+    }));
 
     // Simulate quick back-and-forth to feel like co-editing the brief
     setTimeout(() => {
@@ -3785,6 +3850,26 @@ export default function Home() {
             <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Brief Fields</h3>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                    <span className="text-[10px] font-semibold text-slate-500">Quality</span>
+                    <span
+                      className={`text-[11px] font-semibold ${
+                        briefQualityScore !== null && briefQualityScore >= 8
+                          ? 'text-emerald-700'
+                          : 'text-amber-700'
+                      }`}
+                    >
+                      {briefQualityScore !== null ? `${briefQualityScore.toFixed(1)}/10` : '—'}
+                    </span>
+                  </div>
+                  {briefQualityGaps.length > 0 && (
+                    <div className="hidden sm:flex items-center gap-2 text-[10px] text-slate-500">
+                      <span className="font-semibold text-slate-600">Gaps:</span>
+                      <span className="truncate max-w-[200px]">{briefQualityGaps.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-3">
                 {briefFields.map((field) => {
@@ -3796,15 +3881,13 @@ export default function Home() {
                         <label className="text-[11px] font-medium text-slate-600">
                           {field.label}
                         </label>
-                        {field.isCustom && (
-                          <button
-                            type="button"
-                            onClick={() => deleteCustomBriefField(field.key)}
-                            className="text-[10px] text-slate-400 hover:text-red-500"
-                          >
-                            Remove
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomBriefField(field.key)}
+                          className="text-[10px] text-slate-400 hover:text-red-500"
+                        >
+                          Remove
+                        </button>
                       </div>
                       {multiline ? (
                         <textarea
@@ -6081,6 +6164,13 @@ export default function Home() {
                                       <video
                                         src={c.file_url}
                                         controls
+                                        playsInline
+                                        controlsList="nodownload noremoteplayback nofullscreen"
+                                        disablePictureInPicture
+                                        onDoubleClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                        }}
                                         className="w-full h-32 object-cover"
                                       />
                                     </div>
@@ -6684,7 +6774,7 @@ export default function Home() {
           onClick={() => setConceptDetail(null)}
         >
           <div
-            className="w-[92vw] sm:w-[85vw] md:w-[78vw] lg:w-[72vw] xl:w-[68vw] max-w-5xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden"
+            className="w-[75vw] max-w-5xl h-[75vh] bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
@@ -6718,20 +6808,27 @@ export default function Home() {
                 </svg>
               </button>
             </div>
-            <div className="p-5 space-y-4 max-h-[68vh] overflow-y-auto">
+            <div className="p-5 space-y-4 flex-1 overflow-y-auto">
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
                 {conceptDetail.file_url ? (
                   conceptDetail.file_type?.startsWith('image') ? (
                     <img
                       src={conceptDetail.file_url}
                       alt={conceptDetail.title || conceptDetail.file_name || 'Concept asset'}
-                      className="w-full max-h-80 object-cover"
+                      className="w-full max-h-[60vh] object-contain"
                     />
                   ) : conceptDetail.file_type?.startsWith('video') ? (
                     <video
                       src={conceptDetail.file_url}
                       controls
-                      className="w-full max-h-80 object-cover bg-black"
+                      playsInline
+                      controlsList="nodownload noremoteplayback nofullscreen"
+                      disablePictureInPicture
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="w-full max-h-[60vh] object-contain bg-black"
                     />
                   ) : (
                     <div className="flex items-center justify-between gap-3 px-4 py-3 text-[12px] text-slate-700">
